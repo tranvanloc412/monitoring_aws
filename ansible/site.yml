@@ -1,0 +1,6 @@
+---
+- name: Add/Clean alarm for AWS resources in this account
+  hosts: localhost
+  connection: local
+  roles:
+    - role: cloudwatch_alarms

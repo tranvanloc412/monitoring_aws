@@ -1,0 +1,137 @@
+# CloudWatch Alarms Template for EC2 and RDS
+
+{% if resource_type == "EC2" %}
+# EC2 Instance: {{ instance_name }}
+# Instance ID: {{ instance_id }}
+
+- name: Create CloudWatch Alarm for CPU Utilization
+  aws.cloudwatch:
+    name: "{{ instance_name }}-CPU-Utilization-High"
+    state: present
+    metric: "CPUUtilization"
+    namespace: "AWS/EC2"
+    statistic: "Average"
+    comparison: ">="
+    threshold: {{ ec2_cpu_threshold | default(80) }}
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: InstanceId
+        Value: "{{ instance_id }}"
+    description: "Alarm for high CPU utilization on EC2 instance {{ instance_name }}"
+
+- name: Create CloudWatch Alarm for Memory Utilization
+  aws.cloudwatch:
+    name: "{{ instance_name }}-Memory-Utilization-High"
+    state: present
+    metric: "MemoryUtilization"
+    namespace: "System/Linux"  # Change to "Windows" if needed
+    statistic: "Average"
+    comparison: ">="
+    threshold: {{ ec2_memory_threshold | default(80) }}
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: InstanceId
+        Value: "{{ instance_id }}"
+    description: "Alarm for high memory utilization on EC2 instance {{ instance_name }}"
+
+- name: Create CloudWatch Alarm for Disk Space Utilization
+  aws.cloudwatch:
+    name: "{{ instance_name }}-DiskSpace-Utilization-High"
+    state: present
+    metric: "DiskSpaceUtilization"
+    namespace: "System/Linux"  # Change to "Windows" if needed
+    statistic: "Average"
+    comparison: ">="
+    threshold: {{ ec2_disk_threshold | default(80) }}
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: InstanceId
+        Value: "{{ instance_id }}"
+    description: "Alarm for high disk space utilization on EC2 instance {{ instance_name }}"
+
+- name: Create CloudWatch Alarm for Status Check Failed
+  aws.cloudwatch:
+    name: "{{ instance_name }}-StatusCheckFailed"
+    state: present
+    metric: "StatusCheckFailed"
+    namespace: "AWS/EC2"
+    statistic: "Average"
+    comparison: ">="
+    threshold: 1
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: InstanceId
+        Value: "{{ instance_id }}"
+    description: "Alarm for status check failure on EC2 instance {{ instance_name }}"
+
+{% elif resource_type == "RDS" %}
+# RDS Instance: {{ instance_name }}
+# DB Instance ID: {{ db_instance_id }}
+
+- name: Create CloudWatch Alarm for CPU Utilization
+  aws.cloudwatch:
+    name: "{{ instance_name }}-CPU-Utilization-High"
+    state: present
+    metric: "CPUUtilization"
+    namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison: ">="
+    threshold: {{ rds_cpu_threshold | default(80) }}
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: DBInstanceIdentifier
+        Value: "{{ db_instance_id }}"
+    description: "Alarm for high CPU utilization on RDS instance {{ instance_name }}"
+
+- name: Create CloudWatch Alarm for Memory Utilization
+  aws.cloudwatch:
+    name: "{{ instance_name }}-Memory-Utilization-High"
+    state: present
+    metric: "FreeableMemory"
+    namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison: "<="
+    threshold: {{ rds_memory_threshold | default(200000000) }}  # Free memory threshold in bytes
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: DBInstanceIdentifier
+        Value: "{{ db_instance_id }}"
+    description: "Alarm for low free memory on RDS instance {{ instance_name }}"
+
+- name: Create CloudWatch Alarm for Disk Space Utilization
+  aws.cloudwatch:
+    name: "{{ instance_name }}-DiskSpace-Utilization-High"
+    state: present
+    metric: "FreeStorageSpace"
+    namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison: "<="
+    threshold: {{ rds_disk_threshold | default(50000000000) }}  # Free storage threshold in bytes
+    period: 300
+    evaluation_periods: 2
+    alarm_actions:
+      - "{{ alarm_action }}"
+    dimensions:
+      - Name: DBInstanceIdentifier
+        Value: "{{ db_instance_id }}"
+    description: "Alarm for low free storage space on RDS instance {{ instance_name }}"
+
+{% endif %}

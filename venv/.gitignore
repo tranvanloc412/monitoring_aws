@@ -1,0 +1,23 @@
+# VScode
+.vscode/
+
+# Python-related
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.env/
+.venv/
+
+# Ansible-related
+*.retry
+.cache/
+
+# Shell scripts or OS-related
+.DS_Store
+
+# Logs and temporary files
+logs/
+*.log

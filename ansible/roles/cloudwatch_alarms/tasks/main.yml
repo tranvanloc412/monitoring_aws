@@ -1,0 +1,54 @@
+# - name: Create CloudWatch alarm for RDS CPU Utilization
+#   amazon.aws.cloudwatch_metric_alarm:
+#     state: present
+#     name: "{{ cloudwatch_alarms_alarm_name }}"
+#     metric_name: "CPUUtilization"
+#     namespace: "AWS/RDS"
+#     statistic: Average
+#     comparison: "GreaterThanThreshold"
+#     threshold: "{{ cloudwatch_alarms_cpu_threshold }}"
+#     period: 300
+#     evaluation_periods: 1
+#     unit: "Percent"
+#     dimensions:
+#       Name: DBInstanceIdentifier
+#       Value: "{{ cloudwatch_alarms_instance_id }}"
+#     description: "This will alarm when an instance's CPU usage average is lower than 5% for 15 minutes"
+#     region: "{{ cloudwatch_alarms_aws_region }}"
+#     alarm_actions:
+#       - "{{ cloudwatch_alarms_sns_topic_arn }}"
+#     ok_actions:
+#       - "{{ cloudwatch_alarms_sns_topic_arn }}"
+#   register: create_alarm
+
+# - name: Debug created alarm response
+#   ansible.builtin.debug:
+#     var: create_alarm
+
+- name: Configure CloudWatch Alarms for EC2
+  hosts: ec2_instances
+  vars:
+    resource_type: "EC2"
+    ec2_cpu_threshold: 85
+    ec2_memory_threshold: 75
+    ec2_disk_threshold: 80
+    alarm_action: "arn:aws:sns:us-east-1:123456789012:MyAlarmTopic"
+  tasks:
+    - name: Apply CloudWatch Alarms template
+      template:
+        src: templates/cloudwatch_alarms.j2
+        dest: /tmp/cloudwatch_ec2_alarms.yml # Specify a temporary file if needed
+
+- name: Configure CloudWatch Alarms for RDS
+  hosts: rds_instances
+  vars:
+    resource_type: "RDS"
+    rds_cpu_threshold: 80
+    rds_memory_threshold: 200000000 # 200 MB in bytes
+    rds_disk_threshold: 50000000000 # 50 GB in bytes
+    alarm_action: "arn:aws:sns:us-east-1:123456789012:MyAlarmTopic"
+  tasks:
+    - name: Apply CloudWatch Alarms template
+      template:
+        src: templates/cloudwatch_alarms.j2
+        dest: /tmp/cloudwatch_rds_alarms.yml
