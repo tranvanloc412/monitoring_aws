@@ -83,18 +83,59 @@ def main() -> None:
         logger.error("Exiting due to failure in assuming role.")
         return
 
-    # Run the Ansible playbook
-    run_ansible_playbook(
-        playbook_path=str(PLAYBOOK_PATH),
-        inventory_path=str(INVENTORY_PATH),
-        session=assume_role_session,
+    # Initialize the scanner
+    scanner = ResourceScanner(region_name="ap-southeast-1")
+    # Get resources managed by 'CM'
+    managed_resources = scanner.get_managed_resources()
+
+    # Print each resource's details
+    for resource in managed_resources:
+        logger.info(resource.to_dict())
+
+    # Set up an example alarm configuration
+    alarm_config = AlarmConfig(
+        instance_name="CMSLIDA9001",
+        instance_id="i-0edbded74c49e63a1",
+        alarm_action="arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow",
+        cpu_threshold=85,
+        memory_threshold=75,
+        disk_threshold=80,
+        period=300,
+        evaluation_periods=2,
     )
+    
+    resource_type = "EC2"
+    metric_name = "CPUUtilization"
+
+    # Fetch the global settings and category threshold
+    metric_settings = metric_config.get_metric_settings(resource_type, metric_name)
+    threshold = category_config.get_threshold(resource_type, metric_name)
+
+    # Combine the values into a dictionary for use in alarm creation
+    if metric_settings and threshold is not None:
+        alarm_config = {
+            "name": f"{resource_type}-{metric_name}-Alarm",
+            "metric_name": metric_name,
+            "threshold": threshold,
+            "period": metric_settings["period"],
+            "evaluation_periods": metric_settings["evaluation_periods"],
+            "comparison_operator": "GreaterThanThreshold",
+            "statistic": "Average",
+            "unit": "Percent",
+            "alarm_action": "arn:aws:sns:your-topic-arn"
+        }
+        print("Alarm Configuration:", alarm_config)
+    else:
+        print("Could not find configuration for the specified resource type and metric.")
+
+    # Run the Ansible playbook
+    # run_ansible_playbook(
+    #     playbook_path=str(PLAYBOOK_PATH),
+    #     inventory_path=str(INVENTORY_PATH),
+    #     extra_vars=alarm_config.to_dict(),
+    #     session=assume_role_session,
+    # )
 
 
 if __name__ == "__main__":
     main()
-
-
-# if get_current_assumed_role() == "AUR-Resource-AWS-cmshubnonprod-2FA-cms-jump-provision":
-#     rs = assume_role(cms_lz["environment"]["nonprod"],  CMS_JMP_ROLE)
-#     print(rs)

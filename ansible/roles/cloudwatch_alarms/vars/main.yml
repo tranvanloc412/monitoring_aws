@@ -1,6 +1,0 @@
----
-cloudwatch_alarms_alarm_name: "RDS_CPU_HIGH"
-cloudwatch_alarms_cpu_threshold: 80
-cloudwatch_alarms_instance_id: "database-1"
-cloudwatch_alarms_aws_region: "ap-southeast-1"
-cloudwatch_alarms_sns_topic_arn: "arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"

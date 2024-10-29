@@ -1,0 +1,25 @@
+A:
+  EC2:
+    CPUUtilization: 90
+    MemoryUtilization: 80
+    DiskSpaceUtilization: 85
+  RDS:
+    CPUUtilization: 80
+    FreeStorageSpace: 15
+  FSx:
+    FreeDataStorageSpace: 20
+  NLB:
+    UnHealthyHostCount: 5
+
+B:
+  EC2:
+    CPUUtilization: 80
+    MemoryUtilization: 75
+    DiskSpaceUtilization: 80
+  RDS:
+    CPUUtilization: 70
+    FreeStorageSpace: 20
+  FSx:
+    FreeDataStorageSpace: 25
+  NLB:
+    UnHealthyHostCount: 10
