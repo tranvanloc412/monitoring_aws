@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 class LandingZone:
     name: str
     account_id: str
-    category: str = "D"
+    app_id: str = "CMS"
+    category: str = "CAT_D"
 
 
 class LandingZoneManager:
@@ -52,9 +53,7 @@ class LandingZoneManager:
 
     @classmethod
     def get_all_landing_zones(cls) -> List[LandingZone]:
-        """
-        Returns the current lz_configs dictionary
-        """
+        """Returns the current lz_configs dictionary"""
 
         if cls._lz_configs is None:
             logger.error("Landing zone configurations are not loaded.")
@@ -64,9 +63,8 @@ class LandingZoneManager:
 
     @classmethod
     def get_landing_zone(cls, lz_name: str) -> Optional[LandingZone]:
-        """
-        Retrieves a LandingZone instance by name.
-        """
+        """Retrieves a LandingZone instance by name."""
+
         if cls._lz_configs is None:
             logger.error("Landing zone configurations not loaded.")
             return None
@@ -78,6 +76,7 @@ class LandingZoneManager:
             return LandingZone(
                 name=f"{lz_data['landing_zone']}{env}",
                 account_id=lz_data["environments"]["nonprod"],
+                app_id=lz_data["app_id"],
                 category=lz_data["category"],
             )
         except KeyError as e:

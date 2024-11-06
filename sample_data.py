@@ -77,7 +77,6 @@
     },
 }
 
-
 # Resources
 Resources(
     resources_by_type={
@@ -107,115 +106,37 @@ Resources(
 #  all_alarm_definition:
 [
     AlarmConfig(
-        metric_settings=MetricSettings(
-            resource_type="EC2",
-            name="CPUUtilization",
-            namespace="AWS/EC2",
-            statistic="average",
-            comparison="GreaterThanThreshold",
-            unit="Percent",
-            period=300,
-            evaluation_periods=3,
-        ),
-        threshold_value=70,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
-    ),
-    AlarmConfig(
-        metric_settings=MetricSettings(
-            resource_type="EC2",
-            name="MemoryUtilization",
-            namespace="AWS/EC2",
-            statistic="average",
-            comparison="GreaterThanThreshold",
-            unit="Percent",
-            period=300,
-            evaluation_periods=2,
-        ),
-        threshold_value=75,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
-    ),
-    AlarmConfig(
-        metric_settings=MetricSettings(
-            resource_type="EC2",
-            name="DiskSpaceUtilization",
-            namespace="AWS/EC2",
-            statistic="average",
-            comparison="GreaterThanThreshold",
-            unit="Percent",
-            period=300,
-            evaluation_periods=2,
-        ),
-        threshold_value=80,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
-    ),
-    AlarmConfig(
-        metric_settings=MetricSettings(
-            resource_type="EC2",
-            name="CPUUtilization",
-            namespace="AWS/EC2",
-            statistic="average",
-            comparison="GreaterThanThreshold",
-            unit="Percent",
-            period=300,
-            evaluation_periods=3,
-        ),
-        threshold_value=70,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
-    ),
-    AlarmConfig(
-        metric_settings=MetricSettings(
-            resource_type="EC2",
-            name="MemoryUtilization",
-            namespace="AWS/EC2",
-            statistic="average",
-            comparison="GreaterThanThreshold",
-            unit="Percent",
-            period=300,
-            evaluation_periods=2,
-        ),
-        threshold_value=75,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
-    ),
-    AlarmConfig(
-        metric_settings=MetricSettings(
-            resource_type="EC2",
-            name="DiskSpaceUtilization",
-            namespace="AWS/EC2",
-            statistic="average",
-            comparison="GreaterThanThreshold",
-            unit="Percent",
-            period=300,
-            evaluation_periods=2,
-        ),
-        threshold_value=80,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
-    ),
-    AlarmConfig(
+        name="cmsnonprod-database-1-CPUUtilization",
+        description="Alarm for CPUUtilization on database-1",
         metric_settings=MetricSettings(
             resource_type="RDS",
             name="CPUUtilization",
             namespace="AWS/RDS",
             statistic="average",
-            comparison="GreaterThanThreshold",
+            comparison_operator="GreaterThanThreshold",
             unit="Percent",
             period=300,
             evaluation_periods=3,
         ),
         threshold_value=65,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
+        dimensions=[{"Name": "DBInstanceIdentifier", "Value": "database-1"}],
+        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicHigh"],
     ),
     AlarmConfig(
+        name="cmsnonprod-database-1-FreeStorageSpace",
+        description="Alarm for FreeStorageSpace on database-1",
         metric_settings=MetricSettings(
             resource_type="RDS",
             name="FreeStorageSpace",
             namespace="AWS/RDS",
             statistic="average",
-            comparison="GreaterThanThreshold",
+            comparison_operator="GreaterThanThreshold",
             unit="Percent",
             period=3600,
             evaluation_periods=1,
         ),
         threshold_value=20,
-        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicLow"],
+        dimensions=[{"Name": "DBInstanceIdentifier", "Value": "database-1"}],
+        sns_topic_arns=["arn:aws:sns:ap-southeast-1:891377130283:HIPNotifyTopicHigh"],
     ),
 ]

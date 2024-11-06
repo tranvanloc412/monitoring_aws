@@ -6,10 +6,10 @@
   cost_centre: V_CMS_AWS
   category: CAT_A
 
-# - landing_zone: lz250
-#   environments: 
-#     nonprod: 891377130283
-#     prod:
-#   app_id: BA0529
-#   cost_centre: V_ODRM
-#   category: CAT_B
+- landing_zone: lz250
+  environments: 
+    nonprod: 891377130283
+    prod:
+  app_id: BA0529
+  cost_centre: V_ODRM
+  category: CAT_B

@@ -1,4 +1,3 @@
-boto3 >= 1.26.0
-botocore >= 1.29.0
-pyyaml
-# ansible >= 10.5.0
+boto3>=1.26.0
+botocore>=1.29.0
+pyyaml>=5.4.1

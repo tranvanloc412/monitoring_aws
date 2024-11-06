@@ -1,38 +1,38 @@
 EC2:
   CPUUtilization:
     namespace: "AWS/EC2"
-    statistic: "average"
-    comparison: "GreaterThanThreshold"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
     period: 300
     evaluation_periods: 3
   MemoryUtilization:
     namespace: "AWS/EC2"
-    statistic: "average"
-    comparison: "GreaterThanThreshold"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
     period: 300
     evaluation_periods: 2
   DiskSpaceUtilization:
     namespace: "AWS/EC2"
-    statistic: "average"
-    comparison: "GreaterThanThreshold"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
     period: 300
     evaluation_periods: 2
 
 RDS:
   CPUUtilization:
-    namespace: AWS/RDS
-    statistic: average
-    comparison: "GreaterThanThreshold"
+    namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
     period: 300
     evaluation_periods: 3
   FreeStorageSpace:
-    namespace: AWS/RDS
-    statistic: average
-    comparison: "GreaterThanThreshold"
+    namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
     period: 3600
     evaluation_periods: 1
