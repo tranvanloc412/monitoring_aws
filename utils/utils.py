@@ -8,6 +8,5 @@ def load_yaml(file_path: Union[str, Path]) -> Dict:
         data = yaml.safe_load(file)
     return data
 
-
 # def to_dict(data: dataclass) -> Dict[str, str]:
 #     return asdict(self)

@@ -6,6 +6,7 @@ CONFIG_DIR = "configs"
 LZ_CONFIG = Path(CONFIG_DIR) / "landing_zones.yml"
 THRESHOLDS_CONFIG = Path(CONFIG_DIR) / "thresholds.yml"
 METRICS_CONFIG = Path(CONFIG_DIR) / "metrics_settings.yml"
+CUSTOM_CONFIG = Path(CONFIG_DIR) / "customs.yml"
 
 # Logging
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

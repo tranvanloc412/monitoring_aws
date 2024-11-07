@@ -10,10 +10,8 @@ A collection of utilities for managing AWS resources, including:
 
 __version__ = "0.1.0"
 
-from .landing_zone.manager import LandingZone, LandingZoneManager
-from .iam import AWSSession, SessionManager
-from .cloudwatch import MetricConfig, ThresholdConfig, AlarmManager
-from .resources import ResourceScanner
+from .core import LandingZone, LandingZoneManager, AWSSession, SessionManager, ResourceScanner
+from .monitoring import AlarmManager, AlarmConfig, MonitoringConfig, MetricSettings
 
 __all__ = [
     # Landing Zone related
@@ -24,10 +22,11 @@ __all__ = [
     "AWSSession",
     "SessionManager",
     
-    # CloudWatch related
-    "MetricConfig",
-    "ThresholdConfig",
+    # Monitoring related
     "AlarmManager",
+    "AlarmConfig",
+    "MonitoringConfig",
+    "MetricSettings",
     
     # Resource related
     "ResourceScanner",

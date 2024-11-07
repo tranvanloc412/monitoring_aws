@@ -20,6 +20,13 @@ EC2:
     unit: "Percent"
     period: 300
     evaluation_periods: 2
+  StatusCheckFailed:
+    namespace: "AWS/EC2"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 300
+    evaluation_periods: 2
 
 RDS:
   CPUUtilization:
