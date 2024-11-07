@@ -7,6 +7,9 @@ from .landing_zone import LandingZone
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_REGION = "ap-southeast-1"
+
+
 @dataclass
 class AWSSession:
     session: boto3.Session
@@ -14,6 +17,7 @@ class AWSSession:
     aws_secret_key: str
     security_token: str
     expire_date: str
+    default_region: str = DEFAULT_REGION
 
     def is_valid(self) -> bool:
         """Check if the current session is valid and not expired."""
@@ -35,6 +39,7 @@ class AWSSession:
             logger.error(f"Invalid expiration date format: {e}")
             return None
 
+
 def assume_role(
     lz: LandingZone, role: str, region: str, role_session_name: str
 ) -> Optional[AWSSession]:
@@ -42,14 +47,14 @@ def assume_role(
     role_arn = f"arn:aws:iam::{lz.account_id}:role/{role}"
     try:
         sts_creds = boto3.client("sts").assume_role(
-            RoleArn=role_arn,
-            RoleSessionName=f"{lz.name}-{role_session_name}"
+            RoleArn=role_arn, RoleSessionName=f"{lz.name}-{role_session_name}"
         )["Credentials"]
 
         session = boto3.Session(
             aws_access_key_id=sts_creds["AccessKeyId"],
             aws_secret_access_key=sts_creds["SecretAccessKey"],
             aws_session_token=sts_creds["SessionToken"],
+            region_name=region,
         )
 
         return AWSSession(
@@ -57,11 +62,12 @@ def assume_role(
             aws_access_key=sts_creds["AccessKeyId"],
             aws_secret_key=sts_creds["SecretAccessKey"],
             security_token=sts_creds["SessionToken"],
-            expire_date=sts_creds["Expiration"].isoformat()
+            expire_date=sts_creds["Expiration"].isoformat(),
         )
     except Exception as e:
         logger.error(f"Failed to assume role {role_arn}: {e}")
         return None
+
 
 class SessionManager:
     _sessions: Dict[str, AWSSession] = {}
@@ -71,7 +77,7 @@ class SessionManager:
         cls, lz: LandingZone, role: str, region: str, role_session_name: str
     ) -> Optional[AWSSession]:
         session_key = f"{lz.account_id}:{role}"
-        
+
         if session_key in cls._sessions and cls._sessions[session_key].is_valid():
             return cls._sessions[session_key]
 
