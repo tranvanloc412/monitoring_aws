@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
+
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Metric:
+class MetricConfig:
     """Settings for a CloudWatch metric"""
 
     name: str
@@ -15,16 +16,16 @@ class Metric:
 
 
 @dataclass
-class AlarmConfigs:
+class AlarmConfig:
     """Configuration for a CloudWatch alarm"""
 
-    metric: Metric
+    metric: MetricConfig
     statistic: str
     comparison_operator: str
     unit: str
     period: int
     evaluation_periods: int
-    description: List[Dict[str, Any]] = field(default_factory=list)
+    description: str = ""
     threshold_value: float = 0
     name: str = ""
     sns_topic_arns: List[str] = field(default_factory=list)

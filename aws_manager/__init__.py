@@ -18,7 +18,7 @@ from .core import (
     ResourceScanner,
     Resource,
 )
-from .monitoring import *
+from .monitoring import AlarmManager, MetricConfig, AlarmConfig
 
 __all__ = [
     # Landing Zone related
@@ -32,6 +32,6 @@ __all__ = [
     # Resource related
     "ResourceScanner",
     "Resource",
-    "Metric",
-    "AlarmConfigs",
+    "MetricConfig",
+    "AlarmConfig",
 ]

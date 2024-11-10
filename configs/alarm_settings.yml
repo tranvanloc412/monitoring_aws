@@ -2,7 +2,6 @@ EC2:
   - metric:
       name: CPUUtilization
       namespace: "AWS/EC2"
-      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
@@ -11,7 +10,6 @@ EC2:
   - metric:
       name: MemoryUtilization
       namespace: "AWS/EC2"
-      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
@@ -20,7 +18,6 @@ EC2:
   - metric:
       name: "DiskSpaceUtilization"
       namespace: "AWS/EC2"
-      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
@@ -29,7 +26,6 @@ EC2:
   - metric:
       name: "StatusCheckFailed"
       namespace: "AWS/EC2"
-      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
     unit: "Count"
@@ -47,7 +43,6 @@ EC2:
   - metric:
       name: "LogicalDisk % Free Space"
       namespace: "AWS/EC2"
-      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "LessThanThreshold"
     unit: "Percent"
@@ -58,7 +53,6 @@ RDS:
   - metric:
       name: CPUUtilization
       namespace: "AWS/RDS"
-      dimensions: [{ Name: "DBInstanceIdentifier", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
@@ -67,7 +61,6 @@ RDS:
   - metric:
       name: FreeStorageSpace
       namespace: "AWS/RDS"
-      dimensions: [{ Name: "DBInstanceIdentifier", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "LessThanThreshold"
     unit: "Percent"

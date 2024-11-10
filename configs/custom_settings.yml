@@ -11,16 +11,16 @@ sns_mappings:
     StatusCheckFailed:
       categories: ["CAT_A", "CAT_B"]
       sns_topics:
-        - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicHigh"
+        - HIPNotifySpokeCMSTopicHigh"
     MemoryUtilization:
       categories: ["CAT_C"]
       sns_topics:
-        - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicHigh"
+        - HIPNotifySpokeCMSTopicHigh"
 
 metrics:
-  EC2:
-    - "disk_used_percent"
-    - "LogicalDisk % Free Space"
+  - name: "CPUUtilization"
+    namespace: "AWS/EC2"
+  # - "LogicalDisk % Free Space"
 # custom_thresholds:
 #   CAT_A:
 #     EC2:
@@ -42,3 +42,5 @@ metrics:
 #     - { Name: "InstanceId", Value: "{instance_id}" }
 #     - { Name: "objectname", Value: "{objectname}" }
 #     - { Name: "InstanceType", Value: "{instance_type}" }
+
+# [{"Name": "", "Value": "i-0edbded74c49e63a1"}]

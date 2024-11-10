@@ -1,7 +1,7 @@
 CAT_A:
   description: "Most Critical Systems"
   sns_topic_arns:
-    - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicLow"
+    - HIPNotifySpokeCMSTopicLow"
   thresholds:
     EC2:
       CPUUtilization: 70
@@ -18,7 +18,7 @@ CAT_A:
 CAT_B:
   description: "Most Critical Systems"
   sns_topic_arns:
-    - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicLow"
+    - HIPNotifySpokeCMSTopicLow"
   thresholds:
     EC2:
       CPUUtilization: 70

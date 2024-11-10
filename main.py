@@ -59,9 +59,9 @@ def test():
     # )
     # print(f"alarm: {alarm}")
     alarm_manager = AlarmManager(
-        lz=lz,
-        resources=resources,
-        session=session,
+        landing_zone=lz,
+        aws_session=session,
+        monitored_resources=resources,
         alarm_config_path=CONFIG_PATHS["alarm_settings"],
         category_config_path=CONFIG_PATHS["category_configs"],
         custom_config_path=CONFIG_PATHS["custom_settings"],
@@ -71,7 +71,8 @@ def test():
 
     # print(f"new alarms: {alarm_manager.create_all_alarm_definitions()} \n")
 
-    alarm_manager.deploy_alarms(alarm_manager.create_all_alarm_definitions())
+    print(alarm_manager.create_all_alarm_definitions())
+    # alarm_manager.deploy_alarms(alarm_manager.create_all_alarm_definitions())
 
     # print(f"existing alarms: {alarm_manager.scan_existing_alarms(resources)} \n")
 
