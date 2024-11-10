@@ -1,0 +1,31 @@
+CAT_A:
+  description: "Most Critical Systems"
+  sns_topic_arns:
+    - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicLow"
+  thresholds:
+    EC2:
+      CPUUtilization: 70
+      MemoryUtilization: 75
+      DiskSpaceUtilization: 80
+      StatusCheckFailed: 1
+      disk_used_percent: 80
+      LogicalDisk % Free Space: 20
+
+    RDS:
+      CPUUtilization: 65
+      FreeStorageSpace: 20
+
+CAT_B:
+  description: "Most Critical Systems"
+  sns_topic_arns:
+    - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicLow"
+  thresholds:
+    EC2:
+      CPUUtilization: 70
+      MemoryUtilization: 75
+      DiskSpaceUtilization: 80
+      StatusCheckFailed: 1
+
+    RDS:
+      CPUUtilization: 65
+      FreeStorageSpace: 20

@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Resource:
-    resource_type: str
-    resource_name: str
-    resource_id: str
+    type: str
+    name: str
+    id: str
     # os_type: Optional[str] = None
 
 
@@ -71,9 +71,9 @@ class ResourceScanner:
                     "Unnamed",
                 )
                 resource = Resource(
-                    resource_type=resource_type,
-                    resource_name=resource_name,
-                    resource_id=item["ResourceARN"].split(config["delimiter"])[-1],
+                    type=resource_type,
+                    name=resource_name,
+                    id=item["ResourceARN"].split(config["delimiter"])[-1],
                     # os_type=(
                     #     self._detect_os_type(resource_name)
                     #     if resource_type == "EC2"

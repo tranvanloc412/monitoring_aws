@@ -1,0 +1,84 @@
+EC2:
+  - metric:
+      name: CPUUtilization
+      namespace: "AWS/EC2"
+      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 3
+  - metric:
+      name: MemoryUtilization
+      namespace: "AWS/EC2"
+      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: "DiskSpaceUtilization"
+      namespace: "AWS/EC2"
+      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: "StatusCheckFailed"
+      namespace: "AWS/EC2"
+      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: "disk_used_percent"
+      namespace: "AWS/EC2"
+      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: "LogicalDisk % Free Space"
+      namespace: "AWS/EC2"
+      dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "LessThanThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 2
+
+RDS:
+  - metric:
+      name: CPUUtilization
+      namespace: "AWS/RDS"
+      dimensions: [{ Name: "DBInstanceIdentifier", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 3
+  - metric:
+      name: FreeStorageSpace
+      namespace: "AWS/RDS"
+      dimensions: [{ Name: "DBInstanceIdentifier", Value: "{instance_id}" }]
+    statistic: "Average"
+    comparison_operator: "LessThanThreshold"
+    unit: "Percent"
+    period: 3600
+    evaluation_periods: 1
+# FSx:
+#   FreeDataStorageSpace:
+#     period: 3600
+#     evaluation_periods: 2
+
+# NLB:
+#   UnHealthyHostCount:
+#     period: 60
+#     evaluation_periods: 3

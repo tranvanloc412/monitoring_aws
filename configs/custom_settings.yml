@@ -1,0 +1,44 @@
+disabled_alarms:
+  cmsnonprod:
+    EC2:
+      - CPUUtilization
+      - MemoryUtilization
+    RDS:
+      - CPUUtilization
+
+sns_mappings:
+  EC2:
+    StatusCheckFailed:
+      categories: ["CAT_A", "CAT_B"]
+      sns_topics:
+        - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicHigh"
+    MemoryUtilization:
+      categories: ["CAT_C"]
+      sns_topics:
+        - "arn:aws:sns:{region}:{account_id}:HIPNotifySpokeCMSTopicHigh"
+
+metrics:
+  EC2:
+    - "disk_used_percent"
+    - "LogicalDisk % Free Space"
+# custom_thresholds:
+#   CAT_A:
+#     EC2:
+#       CPUUtilization: 90
+#       MemoryUtilization: 85
+#   CAT_B:
+#     RDS:
+#       DatabaseConnections: 100
+
+# EC2:
+#   "disk_used_percent":
+#     - { Name: "path", Value: "{path}" }
+#     - { Name: "InstanceId", Value: "{instance_id}" }
+#     - { Name: "device", Value: "{device}" }
+#     - { Name: "fstype", Value: "{fstype}" }
+
+#   "LogicalDisk % Free Space":
+#     - { Name: "instance", Value: "{drive}" }
+#     - { Name: "InstanceId", Value: "{instance_id}" }
+#     - { Name: "objectname", Value: "{objectname}" }
+#     - { Name: "InstanceType", Value: "{instance_type}" }

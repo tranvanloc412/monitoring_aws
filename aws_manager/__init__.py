@@ -10,24 +10,28 @@ A collection of utilities for managing AWS resources, including:
 
 __version__ = "0.1.0"
 
-from .core import LandingZone, LandingZoneManager, AWSSession, SessionManager, ResourceScanner
-from .monitoring import AlarmManager, AlarmConfig, MonitoringConfig, MetricSettings
+from .core import (
+    LandingZone,
+    LandingZoneManager,
+    AWSSession,
+    SessionManager,
+    ResourceScanner,
+    Resource,
+)
+from .monitoring import *
 
 __all__ = [
     # Landing Zone related
     "LandingZone",
     "LandingZoneManager",
-    
     # IAM related
     "AWSSession",
     "SessionManager",
-    
     # Monitoring related
     "AlarmManager",
-    "AlarmConfig",
-    "MonitoringConfig",
-    "MetricSettings",
-    
     # Resource related
     "ResourceScanner",
+    "Resource",
+    "Metric",
+    "AlarmConfigs",
 ]

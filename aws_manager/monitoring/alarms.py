@@ -1,190 +1,364 @@
 import boto3
 import logging
-from typing import List, Optional, Dict
+import yaml
+from pathlib import Path
+from typing import Dict, List, Any, Set, Optional, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import copy
 
 from ..core import *
-from .config import *
-
+from .config import AlarmConfigs, Metric
+from utils.utils import load_yaml
 from .constants import *
+from utils.constants import *
 
 logger = logging.getLogger(__name__)
 
 
-class AlarmDefinitionBuilder:
-    """Handles alarm definition creation logic"""
+class AlarmManager:
+    # Class-level configuration caches
+    _alarm_configs: Dict[str, List[AlarmConfigs]] = {}
+    _all_category_configs: Dict[str, Dict[str, Dict[str, Union[float, str]]]] = {}
+    _custom_configs: Dict[str, Any] = {}
 
-    def __init__(self, lz, metric_config, threshold_config, customs):
+    def __init__(
+        self,
+        lz: Optional[LandingZone],
+        resources: List[Resource],
+        alarm_config_path: Path,
+        category_config_path: Path,
+        custom_config_path: Path,
+        session: AWSSession,
+    ):
         self.lz = lz
-        self.metric_config = metric_config
-        self.threshold_config = threshold_config
-        self.custom_config = customs
-        self.session = None
-        self._existing_alarms = None
-
-    def set_session(self, session: AWSSession) -> None:
-        """Set AWS session for alarm operations"""
+        self.resources = resources
         self.session = session
-        self._existing_alarms = None  # Reset cache when session changes
+        self._category_configs: Dict[str, Dict[str, Union[float, str]]] = {}
+        self._existing_alarms: Set[str] = set()
+        self.alarms: List[AlarmConfigs] = []
+        self._resource_ids: Set[str] = {resource.id for resource in self.resources}
+        self._custom_metrics: List[Metric] = []
 
-    def create_alarm_definition(self, resource) -> List[AlarmConfig]:
-        """Create alarm definitions for a specific resource."""
-        metrics = self.metric_config.get_metric_settings(resource.resource_type)
-        thresholds = self.threshold_config.get_thresholds(
-            self.lz.category, resource.resource_type
+        # Load configurations if not already cached
+        self._initialize_configs(
+            alarm_config_path, category_config_path, custom_config_path
         )
-        # I want to check the metrics in a specific namespace in cloudwatch to see if they exist
-        # if not, I want to skip the alarm creation for that metric
-        # if they do exist, I want to get the metric dimensions
 
-        if not metrics or not thresholds:
-            logger.warning(
-                f"No metrics/thresholds for {resource.resource_type} in {self.lz.name}"
+    # ---- Configuration Loading Methods ----
+
+    def _initialize_configs(
+        self,
+        alarm_config_path: Path,
+        category_config_path: Path,
+        custom_config_path: Path,
+    ) -> None:
+        """Initialize all required configurations."""
+        if not self._alarm_configs:
+            self._load_alarm_configs(alarm_config_path)
+            logger.debug(f"Loaded alarm configs: {self._alarm_configs}")
+        if not self._all_category_configs:
+            self._load_all_category_configs(category_config_path)
+            logger.debug(f"_all_category_configs: {self._all_category_configs}")
+        if not self._custom_configs:
+            self._load_custom_configs(custom_config_path)
+
+        self._category_configs = self._get_category_configs()
+        self._threshold_configs = self._get_threshold_configs()
+        self._existing_alarms = self.scan_existing_alarms()
+        self.get_custom_metrics()
+
+    @classmethod
+    def _load_alarm_configs(cls, alarm_config_paths: Path) -> None:
+        """Load and parse alarm configurations from YAML."""
+        try:
+            data = load_yaml(alarm_config_paths)
+            for resource_type, configs in data.items():
+                cls._alarm_configs[resource_type] = [
+                    AlarmConfigs(
+                        metric=Metric(
+                            name=config["metric"]["name"],
+                            namespace=config["metric"]["namespace"],
+                            dimensions=config["metric"]["dimensions"],
+                        ),
+                        statistic=config["statistic"],
+                        comparison_operator=config["comparison_operator"],
+                        unit=config["unit"],
+                        period=config["period"],
+                        evaluation_periods=config["evaluation_periods"],
+                        name=config["name"],
+                    )
+                    for config in configs
+                ]
+        except (yaml.YAMLError, FileNotFoundError) as e:
+            logger.error(f"Error loading alarm configs: {e}")
+            raise ConfigurationError(f"Failed to load alarm configs: {e}")
+
+    @classmethod
+    def _load_all_category_configs(cls, threshold_configs_path: Path) -> None:
+        """Load category-specific configurations."""
+        try:
+            cls._all_category_configs = load_yaml(threshold_configs_path)
+        except Exception as e:
+            logger.error(f"Error loading thresholds: {e}")
+
+    @classmethod
+    def _load_custom_configs(cls, custom_config_path: Path) -> None:
+        """Load custom alarm configurations."""
+        try:
+            cls._custom_configs = load_yaml(custom_config_path)
+        except Exception as e:
+            logger.error(f"Error loading custom configs: {e}")
+
+    # ---- Configuration Getter Methods ----
+
+    def _get_category_configs(self) -> Dict[str, Dict[str, Union[float, str]]]:
+        """Get configurations specific to the current landing zone category."""
+        return self._all_category_configs.get(self.lz.category, {})
+
+    def _get_threshold_configs(self) -> Dict[str, Dict[str, float]]:
+        """Get threshold value for a specific resource type and metric."""
+        return self._category_configs.get("thresholds", {})
+
+    def _get_sns_topics(self, resource_type: str, metric_name: str) -> List[str]:
+        """Get SNS topic ARNs for the given resource type and metric."""
+        sns_topic_arns = self._category_configs.get("sns_topic_arns", [])
+
+        # Get custom topic configuration
+        custom_sns_mappings = (
+            self._custom_configs.get("sns_mappings", {})
+            .get(resource_type, {})
+            .get(metric_name, {})
+        )
+
+        if self.lz.category in custom_sns_mappings.get("categories", []):
+            sns_topic_arns = custom_sns_mappings.get("sns_topics", [])
+
+        # Format each topic ARN and create a new list
+        formatted_topics = [
+            topic.format(region=DEFAULT_REGION, account_id=self.lz.account_id)
+            for topic in sns_topic_arns
+        ]
+
+        return formatted_topics
+
+    def get_custom_metrics(self) -> List[Metric]:
+        """Get custom metrics from configuration."""
+        for custom_metric in self._custom_configs.get("metrics", []):
+            metrics = self._get_metrics_in_namespace(custom_metric)
+            self._custom_metrics.extend(metrics)
+        return self._custom_metrics
+
+    def _update_dimensions(
+        self, metric: Metric, resource: Resource
+    ) -> List[Dict[str, str]]:
+        """Get dimensions for a specific resource."""
+        format_vars = {
+            "instance_id": resource.id,
+            "name": resource.name,
+            "type": resource.type,
+        }
+
+        # Handle custom metrics case first
+        if metric.name in self._custom_configs.get("dimensions", {}).get("metrics", []):
+            return [
+                dim
+                for metric in self._custom_metrics
+                if metric.dimensions.get("InstanceId") == resource.id
+                for dim in (
+                    [metric.dimensions]
+                    if isinstance(metric.dimensions, dict)
+                    else metric.dimensions
+                )
+            ]
+
+        # Handle standard dimension updates
+        try:
+            updated_dimensions = copy.deepcopy(metric.dimensions)
+            if not isinstance(updated_dimensions, list):
+                updated_dimensions = [updated_dimensions]
+
+            for dimension in updated_dimensions:
+                if not isinstance(dimension, dict):
+                    logger.warning(f"Invalid dimension format: {dimension}")
+                    continue
+
+                if "Value" not in dimension:
+                    continue
+
+                try:
+                    dimension["Value"] = dimension["Value"].format(**format_vars)
+                except KeyError as e:
+                    logger.warning(
+                        f"Missing format variable {e} for dimension {dimension}. "
+                        f"Available variables: {list(format_vars.keys())}"
+                    )
+                except ValueError as e:
+                    logger.warning(
+                        f"Invalid format string in dimension {dimension}: {e}"
+                    )
+
+            return updated_dimensions
+
+        except Exception as e:
+            logger.error(f"Failed to update dimensions: {e}")
+            return []
+
+    # ---- Alarm Creation Methods ----
+
+    def create_alarm_definition(
+        self, alarm: AlarmConfigs, resource: Resource
+    ) -> Optional[AlarmConfigs]:
+        """Create or update alarm definition for a specific resource and metric."""
+        try:
+            # Sanitize metric name for alarm name construction
+            sanitized_metric_name = alarm.metric.name.replace(" ", "").replace("%", "")
+            alarm_name = f"{self.lz.name}-{resource.type}-{resource.name}-{sanitized_metric_name}"
+            logger.debug(f"Constructing alarm definition for: {alarm_name}")
+
+            # Early returns for invalid cases
+            if self._is_alarm_exists(alarm_name):
+                logger.info(f"Alarm {alarm_name} already exists, skipping creation")
+                return None
+
+            threshold = self._threshold_configs.get(resource.type, {}).get(
+                alarm.metric.name
+            )
+            if threshold is None:
+                logger.warning(
+                    f"No threshold configured for {resource.type}.{alarm.metric.name}, "
+                    f"skipping alarm creation"
+                )
+                return None
+
+            # Create new alarm configuration
+            new_alarm = copy.deepcopy(alarm)  # Prevent modifying the original config
+            new_alarm.name = alarm_name
+            new_alarm.description = f"Alarm for {alarm.metric.name} on {resource.name}"
+            new_alarm.metric.dimensions = self._update_dimensions(
+                alarm.metric, resource
+            )
+            new_alarm.threshold_value = threshold
+            new_alarm.sns_topic_arns = self._get_sns_topics(
+                resource.type, alarm.metric.name
+            )
+
+            logger.debug(f"Successfully created alarm definition for {alarm_name}")
+            return new_alarm
+
+        except Exception as e:
+            logger.error(
+                f"Failed to create alarm definition for {resource.id}: {str(e)}",
+                exc_info=True,
+            )
+            return None
+
+    def create_alarm_definitions(self, resource: Resource) -> List[AlarmConfigs]:
+        """Create alarm definitions for all metrics of a specific resource."""
+        try:
+            logger.debug(f"Creating alarm definitions for resource: {resource.id}")
+
+            # Get alarm configs for resource type
+            alarms = self._alarm_configs.get(resource.type, [])
+            if not alarms:
+                logger.info(
+                    f"No alarm configurations found for resource type: {resource.type}"
+                )
+                return []
+
+            # Create alarm definitions
+            result_alarms = [
+                alarm_def
+                for alarm in alarms
+                if (alarm_def := self.create_alarm_definition(alarm, resource))
+            ]
+
+            logger.info(
+                f"Created {len(result_alarms)} alarm definitions for resource {resource.id}"
+            )
+            return result_alarms
+
+        except Exception as e:
+            logger.error(
+                f"Failed to create alarm definitions for resource {resource.id}: {str(e)}",
+                exc_info=True,
             )
             return []
 
-        alarm_configs = []
-        for metric in metrics.values():
-            threshold = thresholds.get(metric.name)
-            if not self._is_valid_alarm(metric, threshold, resource):
-                continue
-
-            # Check if the metric exists in CloudWatch
-            if not self._metric_exists_in_cloudwatch(metric, resource):
-                logger.info(
-                    f"Metric {metric.name} does not exist for {resource.resource_name}, skipping alarm creation."
-                )
-                continue
-
-            alarm_configs.append(self._build_alarm_config(resource, metric, threshold))
-
-        return alarm_configs
-
-    def _metric_exists_in_namespace(self, metric, resource) -> bool:
-        """Check if a metric exists in CloudWatch."""
-        if not self.session:
-            return False
-
-        cloudwatch = self.session.session.client("cloudwatch")
+    def create_all_alarm_definitions(self) -> List[AlarmConfigs]:
+        """Create alarm definitions for all resources."""
         try:
-            response = cloudwatch.list_metrics(
-                Namespace=metric.namespace,
-                MetricName=metric.name,
-                Dimensions=self._get_dimensions_for_resource(resource),
+            logger.info(
+                f"Creating alarm definitions for {len(self.resources)} resources"
             )
-            return len(response.get("Metrics", [])) > 0
+
+            # Process resources in parallel for better performance
+            with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
+                future_to_resource = {
+                    executor.submit(self.create_alarm_definitions, resource): resource
+                    for resource in self.resources
+                }
+
+                all_alarms = []
+                for future in as_completed(future_to_resource):
+                    resource = future_to_resource[future]
+                    try:
+                        alarm_defs = future.result()
+                        if alarm_defs:
+                            all_alarms.extend(alarm_defs)
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to process resource {resource.id}: {str(e)}",
+                            exc_info=True,
+                        )
+
+            logger.info(
+                f"Successfully created {len(all_alarms)} alarm definitions in total"
+            )
+            return all_alarms
+
         except Exception as e:
-            logger.error(f"Error checking metric {metric.name} existence: {e}")
-            return False
-
-    def _build_alarm_config(self, resource, metric, threshold) -> AlarmConfig:
-        name = f"{self.lz.name}-{resource.resource_name}-{metric.name}"
-        return AlarmConfig(
-            name=name,
-            description=f"Alarm for {metric.name} on {resource.resource_name}",
-            metric_settings=metric,
-            threshold_value=threshold,
-            dimensions=self._get_dimensions_for_resource(resource),
-            sns_topic_arns=self._get_sns_topics(
-                self.lz, resource.resource_type, metric.name
-            ),
-        )
-
-    def _get_sns_topics(
-        self, lz: LandingZone, resource_type: str, metric_name: str
-    ) -> List[str]:
-        """Get SNS topic ARNs for the given resource type and metric."""
-        sns_prefix = f"arn:aws:sns:{DEFAULT_REGION}:{lz.account_id}:"
-
-        # First try to get custom topic configuration
-        topic = self.custom_config.get_sns_topic(
-            resource_type, metric_name, lz.category
-        )
-
-        # If no custom topic, use default based on category
-        if not topic:
-            topic = (
-                SNSTopic.MEDIUM.value
-                if lz.category == Category.A.value
-                else SNSTopic.LOW.value
+            logger.error(
+                f"Failed to create all alarm definitions: {str(e)}", exc_info=True
             )
+            return []
 
-        logger.debug(
-            f"SNS topic for {resource_type} {metric_name} {lz.category}: {topic}"
-        )
-        return [f"{sns_prefix}{topic}"]
+    # ---- Alarms Deployment Methods ----
 
-    def _is_valid_alarm(
-        self, metric: MetricSettings, threshold: float, resource: Resource
-    ) -> bool:
-        """Check if alarm should be created based on configuration and existing alarms."""
-        if not threshold:
-            return False
+    def _deploy_single_alarm(self, session: AWSSession, alarm: AlarmConfigs) -> None:
+        """Deploy a single CloudWatch alarm."""
+        if not alarm.name:  # Add validation
+            logger.error("Cannot deploy alarm with no name")
+            return
 
-        alarm_name = f"{self.lz.name}-{resource.resource_name}-{metric.name}"
-        is_disabled = self.custom_config.is_alarm_disabled(
-            self.lz.name, resource.resource_type, metric.name
-        )
-        exists = self.session and self._is_alarm_exists(alarm_name)
-
-        return not (is_disabled or exists)
-
-    def _is_alarm_exists(self, alarm_name: str) -> bool:
-        if not self.session:
-            return False
-        existing_alarms = self._get_existing_alarms(self.session)
-        return alarm_name in existing_alarms
-
-    def _get_existing_alarms(self, session: AWSSession) -> List[str]:
-        """Get existing CMS-managed alarms."""
-        if self._existing_alarms is not None:
-            return self._existing_alarms
-
+        cloudwatch = session.session.client("cloudwatch")
         try:
-            scanner = ResourceScanner(session)
-            resources = scanner.get_resources_by_tag(
-                tags={MANAGE_BY_TAG_KEY: CMS_MANAGED_TAG_VALUE},
-                resource_config={
-                    "CloudWatch": {"type": "cloudwatch:alarm", "delimiter": ":"}
-                },
+            cloudwatch.put_metric_alarm(
+                AlarmName=alarm.name,
+                MetricName=alarm.metric.name,
+                Namespace=alarm.metric.namespace,
+                Dimensions=alarm.metric.dimensions,
+                Statistic=alarm.statistic,
+                Period=alarm.period,
+                EvaluationPeriods=alarm.evaluation_periods,
+                Threshold=alarm.threshold_value,
+                ComparisonOperator=alarm.comparison_operator,
+                ActionsEnabled=True,
+                AlarmActions=alarm.sns_topic_arns or [],  # Ensure we don't pass None
+                AlarmDescription=alarm.description
+                or "",  # Provide default empty string
+                Unit=alarm.unit,
+                Tags=self._build_alarm_tags(alarm.name),
             )
-            self._existing_alarms = [
-                resource.resource_name
-                for resource in resources
-                if hasattr(resource, "resource_name")
-            ]
         except Exception as e:
-            logger.error(f"Error fetching existing alarms: {str(e)}")
-            self._existing_alarms = []
+            logger.error(f"Error deploying alarm {alarm.name}: {str(e)}")
+            raise
 
-        return self._existing_alarms
-
-    def _get_dimensions_for_resource(self, resource) -> List[Dict[str, str]]:
-        """Get CloudWatch dimensions for the given resource."""
-        return [{"Name": "ResourceId", "Value": resource.resource_id}]
-
-
-class AlarmDeployer:
-    """Handles alarm deployment to AWS"""
-
-    def __init__(self, session, lz):
-        self.session = session
-        self.lz = lz
-
-    def deploy_alarms(self, alarms: List[AlarmConfig]) -> None:
+    def deploy_alarms(self, alarms: List[AlarmConfigs]) -> None:
         """Deploy alarms in parallel batches."""
-        if not self.session:
-            raise ValueError("AWS session required for deployment")
-
-        cloudwatch = self.session.session.client("cloudwatch")
-        self._deploy_alarm_batch(cloudwatch, alarms)
-
-    def _deploy_alarm_batch(self, cloudwatch, alarms: List[AlarmConfig]) -> None:
-        """Deploy a batch of alarms using thread pool."""
         with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
             futures = {
                 executor.submit(
-                    self._deploy_single_alarm, cloudwatch, alarm
+                    self._deploy_single_alarm, self.session, alarm
                 ): alarm.name
                 for alarm in alarms
             }
@@ -197,28 +371,26 @@ class AlarmDeployer:
                 except Exception as e:
                     logger.error(f"Failed to deploy {alarm_name}: {e}")
 
-    def _deploy_single_alarm(self, cloudwatch, alarm: AlarmConfig) -> None:
-        """Deploy a single CloudWatch alarm."""
-        try:
-            cloudwatch.put_metric_alarm(
-                AlarmName=alarm.name,
-                MetricName=alarm.metric_settings.name,
-                Namespace=alarm.metric_settings.namespace,
-                Statistic=alarm.metric_settings.statistic,
-                Period=alarm.metric_settings.period,
-                EvaluationPeriods=alarm.metric_settings.evaluation_periods,
-                Threshold=alarm.threshold_value,
-                ComparisonOperator=alarm.metric_settings.comparison_operator,
-                ActionsEnabled=True,
-                AlarmActions=alarm.sns_topic_arns or [],
-                AlarmDescription=alarm.description,
-                Dimensions=alarm.dimensions or [],
-                Unit=alarm.metric_settings.unit,
-                Tags=self._build_alarm_tags(alarm.name),
+    # ---- Utility Methods ----
+
+    def _is_alarm_exists(self, alarm_name: str) -> bool:
+        """Check if an alarm already exists."""
+        if not self._existing_alarms:
+            self.scan_existing_alarms()
+        return alarm_name in self._existing_alarms
+
+    def scan_existing_alarms(self) -> Set[str]:
+        """Scan and cache existing alarms in the AWS account."""
+        resource_scanner = ResourceScanner(self.session, DEFAULT_REGION)
+        if not self._existing_alarms:
+            scanned_alarms = resource_scanner.get_resources_by_tag(
+                tags={MANAGE_BY_TAG_KEY: CMS_MANAGED_TAG_VALUE},
+                resource_config={
+                    "CloudWatch": {"type": "cloudwatch:alarm", "delimiter": ":"}
+                },
             )
-        except Exception as e:
-            logger.error(f"Error deploying alarm {alarm.name}: {str(e)}")
-            raise
+            self._existing_alarms = {alarm.name for alarm in scanned_alarms}
+        return self._existing_alarms
 
     def _build_alarm_tags(self, alarm_name: str) -> List[Dict[str, str]]:
         """Create standardized tags for CloudWatch alarms."""
@@ -230,49 +402,19 @@ class AlarmDeployer:
             {"Key": MANAGE_BY_TAG_KEY, "Value": CMS_MANAGED_TAG_VALUE},
         ]
 
+    def _get_metrics_in_namespace(self, custom_metric: Metric) -> List[Metric]:
+        client = self.session.session.client("cloudwatch")
 
-class AlarmManager:
-    """Unified alarm management"""
+        metrics = client.list_metrics(
+            Namespace=custom_metric.namespace,
+            MetricName=custom_metric.name,
+        ).get("Metrics", [])
 
-    def __init__(self, lz: LandingZone, session: AWSSession, config: MonitoringConfig):
-        self.lz = lz
-        self.session = session
-        self.config = config
-        self.builder = AlarmDefinitionBuilder(
-            lz=lz, metric_config=config, threshold_config=config, customs=config
-        )
-        self.builder.set_session(session)
-        self.deployer = AlarmDeployer(session, lz)
-
-    def deploy_alarms(self, resources: List[Resource]) -> None:
-        """Deploy alarms for the given resources with proper error handling"""
-        try:
-            alarm_configs = self._create_alarm_configs(resources)
-            if alarm_configs:
-                self._deploy_alarms(alarm_configs)
-            else:
-                logger.warning(f"No alarm configurations generated for {self.lz.name}")
-        except Exception as e:
-            logger.error(f"Failed to deploy alarms for {self.lz.name}: {e}")
-            raise
-
-    def _create_alarm_configs(self, resources: List[Resource]) -> List[AlarmConfig]:
-        """Create alarm configurations for all resources."""
-        all_configs = []
-        for resource in resources:
-            try:
-                configs = self.builder.create_alarm_definition(resource)
-                all_configs.extend(configs)
-            except Exception as e:
-                logger.error(
-                    f"Failed to create alarm config for {resource.resource_id}: {e}"
-                )
-        return all_configs
-
-    def _deploy_alarms(self, alarms: List[AlarmConfig]):
-        """Deploy all alarm configurations."""
-        try:
-            self.deployer.deploy_alarms(alarms)
-        except Exception as e:
-            logger.error(f"Failed to deploy alarms: {e}")
-            raise
+        return [
+            Metric(
+                namespace=custom_metric.namespace,
+                name=metric["MetricName"],
+                dimensions=metric["Dimensions"],
+            )
+            for metric in metrics
+        ]

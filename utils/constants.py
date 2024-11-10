@@ -3,10 +3,10 @@ from typing import Final
 
 # File paths
 CONFIG_DIR = "configs"
-LZ_CONFIG = Path(CONFIG_DIR) / "landing_zones.yml"
-THRESHOLDS_CONFIG = Path(CONFIG_DIR) / "thresholds.yml"
-METRICS_CONFIG = Path(CONFIG_DIR) / "metrics_settings.yml"
-CUSTOM_CONFIG = Path(CONFIG_DIR) / "customs.yml"
+LZ_CONFIG = Path(CONFIG_DIR) / "landing_zone_configs.yml"
+ALARM_SETTINGS = Path(CONFIG_DIR) / "alarm_settings.yml"
+CATEGORY_CONFIGS = Path(CONFIG_DIR) / "category_configs.yml"
+CUSTOM_SETTINGS = Path(CONFIG_DIR) / "custom_settings.yml"
 
 # Logging
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

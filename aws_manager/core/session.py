@@ -75,7 +75,7 @@ class SessionManager:
     @classmethod
     def get_or_create_session(
         cls, lz: LandingZone, role: str, region: str, role_session_name: str
-    ) -> Optional[AWSSession]:
+    ) -> AWSSession:
         session_key = f"{lz.account_id}:{role}"
 
         if session_key in cls._sessions and cls._sessions[session_key].is_valid():

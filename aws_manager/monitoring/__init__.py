@@ -1,9 +1,4 @@
-from .config import MonitoringConfig, MetricSettings
-from .alarms import AlarmConfig, AlarmManager
+from .alarms import AlarmManager
+from .config import Metric, AlarmConfigs
 
-__all__ = [
-    "MonitoringConfig",
-    "MetricSettings",
-    "AlarmConfig",
-    "AlarmManager",
-]
+__all__ = ["AlarmManager", "Metric", "AlarmConfigs"]
