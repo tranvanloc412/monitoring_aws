@@ -8,15 +8,7 @@ EC2:
     period: 300
     evaluation_periods: 3
   - metric:
-      name: MemoryUtilization
-      namespace: "AWS/EC2"
-    statistic: "Average"
-    comparison_operator: "GreaterThanThreshold"
-    unit: "Percent"
-    period: 300
-    evaluation_periods: 2
-  - metric:
-      name: "DiskSpaceUtilization"
+      name: "mem_used_percent"
       namespace: "AWS/EC2"
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
@@ -33,7 +25,7 @@ EC2:
     evaluation_periods: 2
   - metric:
       name: "disk_used_percent"
-      namespace: "AWS/EC2"
+      namespace: "CWAgent"
       dimensions: [{ Name: "InstanceId", Value: "{instance_id}" }]
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
@@ -42,7 +34,7 @@ EC2:
     evaluation_periods: 2
   - metric:
       name: "LogicalDisk % Free Space"
-      namespace: "AWS/EC2"
+      namespace: "CWAgent"
     statistic: "Average"
     comparison_operator: "LessThanThreshold"
     unit: "Percent"

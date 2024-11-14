@@ -5,8 +5,7 @@ CAT_A:
   thresholds:
     EC2:
       CPUUtilization: 70
-      MemoryUtilization: 75
-      DiskSpaceUtilization: 80
+      mem_used_percent: 75
       StatusCheckFailed: 1
       disk_used_percent: 80
       LogicalDisk % Free Space: 20
@@ -22,9 +21,10 @@ CAT_B:
   thresholds:
     EC2:
       CPUUtilization: 70
-      MemoryUtilization: 75
-      DiskSpaceUtilization: 80
+      mem_used_percent: 75
       StatusCheckFailed: 1
+      disk_used_percent: 80
+      LogicalDisk % Free Space: 20
 
     RDS:
       CPUUtilization: 65

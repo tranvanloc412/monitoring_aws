@@ -13,7 +13,6 @@ class Resource:
     type: str
     name: str
     id: str
-    # os_type: Optional[str] = None
 
 
 class ResourceScanner:
@@ -21,18 +20,6 @@ class ResourceScanner:
         "EC2": {"type": "ec2:instance", "delimiter": "/"},
         "RDS": {"type": "rds:db", "delimiter": ":"},
     }
-
-    # def _detect_os_type(self, resource_name: str) -> Optional[str]:
-    #     # Check for pattern: xxxLxxx1234 or xxxWxxx1234
-    #     if len(resource_name) >= 8 and resource_name[-4:].isdigit():
-    #         # Extract the OS identifier letter (4 positions before the digits)
-    #         os_identifier = resource_name[-8].upper()
-    #         if os_identifier == "W":
-    #             return "Windows"
-    #         elif os_identifier == "L":
-    #             return "Linux"
-    #     # Return None if pattern doesn't match
-    #     return None
 
     def __init__(self, session: AWSSession, region_name: Optional[str] = None):
         self.client = session.session.client(
@@ -74,11 +61,6 @@ class ResourceScanner:
                     type=resource_type,
                     name=resource_name,
                     id=item["ResourceARN"].split(config["delimiter"])[-1],
-                    # os_type=(
-                    #     self._detect_os_type(resource_name)
-                    #     if resource_type == "EC2"
-                    #     else None
-                    # ),
                 )
                 all_resources.append(resource)
         return all_resources
