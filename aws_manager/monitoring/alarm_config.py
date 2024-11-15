@@ -1,75 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Dict, Set, List, Optional, Union
+from typing import List, Optional, Union
 
-
-@dataclass
-class MetricConfig:
-    """Settings for a CloudWatch metric
-
-    Attributes:
-        name: The name of the metric
-        namespace: The namespace of the metric (e.g., 'AWS/EC2')
-        dimensions: List of key-value pairs that identify the metric
-    """
-
-    name: str
-    namespace: str
-    dimensions: List[Dict[str, str]] = field(default_factory=list)
-
-
-@dataclass
-class ResourceMetrics:
-    """Manages CloudWatch metrics for different AWS resources"""
-
-    def __init__(self) -> None:
-        self.metrics: Dict[str, List[MetricConfig]] = {}
-
-    def add_metric(self, metric: MetricConfig) -> bool:
-        """Add a metric configuration for a resource.
-
-        Returns:
-            bool: True if metric was added successfully, False otherwise
-        """
-        instance_dimensions = [
-            d for d in metric.dimensions if d["Name"] == "InstanceId"
-        ]
-        if not instance_dimensions:
-            return False
-
-        resource_id = instance_dimensions[0]["Value"]
-        if resource_id not in self.metrics:
-            self.metrics[resource_id] = []
-        if metric not in self.metrics[resource_id]:
-            self.metrics[resource_id].append(metric)
-        return True
-
-    def is_metric_exists(self, metric: MetricConfig, resource_id: str) -> bool:
-        """Check if a metric exists for a specific resource."""
-        return metric in self.metrics.get(resource_id, [])
-
-    def get_metrics(self, resource_id: str) -> List[MetricConfig]:
-        return self.metrics.get(resource_id, [])
-
-    def __bool__(self) -> bool:
-        return bool(self.metrics)
+from .metric_config import MetricConfig
 
 
 @dataclass
 class AlarmConfig:
-    """Configuration for a CloudWatch alarm
-
-    Attributes:
-        metric: The metric to monitor
-        statistic: The statistic to apply (e.g., 'Average', 'Sum')
-        comparison_operator: The comparison operator (e.g., 'GreaterThanThreshold')
-        unit: The unit of measurement
-        period: The period in seconds over which to evaluate
-        evaluation_periods: Number of periods to evaluate
-        description: Optional alarm description
-        threshold_value: The threshold value to compare against
-        name: Unique name for the alarm
-        sns_topic_arns: List of SNS topics to notify
-    """
+    """Configuration for a CloudWatch alarm"""
 
     metric: MetricConfig
     statistic: str

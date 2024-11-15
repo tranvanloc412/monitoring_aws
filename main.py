@@ -92,12 +92,15 @@ def process_landing_zone(lz, args, logger: logging.Logger) -> None:
             "delete": delete_alarms,
         }
 
-        # Execute the corresponding method for the action
-        action_method = action_methods.get(args.action)
-        if action_method:
-            action_method(alarm_manager, logger, lz)
+        # Handle dry run or execute the actual action
+        if args.dry_run:
+            dry_run(alarm_manager, logger, lz, args.action)
         else:
-            logger.error(f"Unknown action: {args.action}")
+            action_method = action_methods.get(args.action)
+            if action_method:
+                action_method(alarm_manager, logger, lz)
+            else:
+                logger.error(f"Unknown action: {args.action}")
 
     except Exception as e:
         logger.error(f"Error processing landing zone {lz}: {e}")
@@ -125,6 +128,28 @@ def delete_alarms(alarm_manager, logger, lz):
     logger.info(f"Successfully deleted alarms for landing zone: {lz}")
 
 
+def dry_run(alarm_manager, logger, lz, action):
+    """Simulate the execution of the specified action."""
+    logger.info(f"[DRY RUN] Simulating '{action}' for landing zone: {lz}")
+
+    if action == "create":
+        alarm_definitions = alarm_manager.create_all_alarm_definitions()
+        logger.info(
+            f"[DRY RUN] Would create {len(alarm_definitions)} alarm definitions"
+        )
+        # Log sample of what would be created
+        for alarm in alarm_definitions[:3]:  # Show first 3 as example
+            logger.info(f"[DRY RUN] Would create alarm: {alarm}")
+
+    elif action == "delete":
+        logger.info(f"[DRY RUN] Would delete all alarms for landing zone: {lz}")
+
+    elif action == "scan":
+        logger.info(f"[DRY RUN] Would scan resources for landing zone: {lz}")
+
+    logger.info(f"[DRY RUN] Completed simulation for landing zone: {lz}")
+
+
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="CMS Monitoring Alarm Management")
@@ -143,6 +168,13 @@ def parse_arguments() -> argparse.Namespace:
         required=True,
         help="Action to perform: 'create', 'scan', or 'delete'",
     )
+    parser.add_argument(
+        "--dry-run",
+        "-dr",
+        action="store_true",
+        help="Dry run the action",
+    )
+
     parser.add_argument(
         "--change-request",
         "-cr",

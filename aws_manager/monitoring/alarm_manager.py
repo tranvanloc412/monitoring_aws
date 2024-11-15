@@ -5,7 +5,9 @@ from typing import Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core import LandingZone, AWSSession, Resource, ResourceScanner
-from .alarm_config import AlarmConfig, Alarms, ResourceMetrics, MetricConfig
+from .alarm_config import AlarmConfig, Alarms
+from .metric_config import MetricConfig, CWAgentMetrics
+
 from .constants import *
 from .alarm_config_manager import AlarmConfigManager
 
@@ -31,10 +33,6 @@ class AlarmManager:
         self.landing_zone = landing_zone
         self.aws_session = aws_session
         self.monitored_resources = monitored_resources
-
-        # Initialize state
-        self._existing_alarms: set[str] = set()
-        self._existing_custom_metrics = ResourceMetrics()
 
         # Load configurations
         self._load_configurations(
@@ -68,7 +66,7 @@ class AlarmManager:
         logger.info(
             f"Successfully scanned resources for landing zone: {self.landing_zone.name}"
         )
-        logger.info(f"Existing alarms: {self._existing_alarms}")
+        # logger.info(f"Existing alarms: {self._existing_alarms}")
 
     def delete_alarms(self) -> None:
         """Delete all alarms in the AWS account."""
@@ -84,10 +82,21 @@ class AlarmManager:
         """Create alarm definitions for all resources."""
         try:
             all_alarm_definitions = Alarms()
-            for resource in self.monitored_resources:
-                alarms = self._create_alarm_definitions(resource)
+            with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
+                futures = {
+                    executor.submit(self._create_alarm_definitions, resource): resource
+                    for resource in self.monitored_resources
+                }
 
-                all_alarm_definitions.add_alarm(alarms)
+                for future in as_completed(futures):
+                    resource = futures[future]
+                    try:
+                        alarms = future.result()
+                        all_alarm_definitions.add_alarm(alarms)
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to create alarm definitions for {resource.name}: {e}"
+                        )
 
             return all_alarm_definitions
         except Exception as e:
@@ -118,9 +127,15 @@ class AlarmManager:
 
     def _load_states(self):
         self._existing_alarms = set()
-        self._existing_custom_metrics = ResourceMetrics()
+        self._cwagent_metrics = CWAgentMetrics()
+        self._monitored_ec2 = {
+            resource.id
+            for resource in self.monitored_resources
+            if resource.type == "EC2"
+        }
         self._scan_existing_alarms()
-        self._fetch_existing_custom_metrics()
+        self._fetch_cwagent_metrics()
+        # print(f"self._cwagent_metrics: {self._cwagent_metrics.metrics}")
 
     def _get_alarm_config_by_resource_type(
         self, resource_type: str
@@ -175,15 +190,16 @@ class AlarmManager:
         for alarm_config in alarm_configs:
             try:
                 alarm_def = self._create_single_alarm_definition(alarm_config, resource)
-                if not alarm_def:
-                    continue
+                if alarm_def:
+                    if self._is_cwagent_namespace(alarm_config.metric.namespace):
+                        # Only add CWAgent-specific alarms for CWAgent namespace
+                        alarm_definitions.add_alarm(
+                            self._create_cwagent_alarm_definitions(alarm_def, resource)
+                        )
+                    else:
+                        # Add regular alarm for non-CWAgent namespaces
+                        alarm_definitions.add_alarm(alarm_def)
 
-                if self._is_custom_metric(alarm_def.metric.name):
-                    alarm_definitions.add_alarm(
-                        self._update_alarm_definitions(alarm_def, resource)
-                    )
-                else:
-                    alarm_definitions.add_alarm(alarm_def)
             except Exception as e:
                 logger.error(
                     f"Failed to create alarm definition for {resource.name}: {e}"
@@ -195,12 +211,57 @@ class AlarmManager:
         )
         return alarm_definitions
 
+    def _create_cwagent_alarm_definitions(
+        self, alarm_def: AlarmConfig, resource: Resource
+    ) -> Alarms:
+        """Create multiple alarm definitions for cwagent metrics."""
+        cwagent_alarm_definitions = Alarms()
+        logger.info(f"Creating CWAgent alarm definitions for resource: {resource.id}")
+
+        try:
+            cwagent_metrics = (
+                self._cwagent_metrics.get_metrics(resource.id, alarm_def.metric.name)
+                or []
+            )
+
+            for metric in cwagent_metrics:
+                try:
+                    # Extract distinct dimension value safely
+                    distinct_value = ""
+                    if metric.distinct_dimension:
+                        distinct_value = next(
+                            iter(metric.distinct_dimension.values()), "unknown"
+                        )
+
+                    # Create base alarm name without redundant information
+                    new_alarm_def = deepcopy(alarm_def)
+                    new_alarm_def.name = f"{alarm_def.name}-{distinct_value}"
+
+                    if self._is_alarm_exists(new_alarm_def.name):
+                        logger.info(
+                            f"Alarm {new_alarm_def.name} already exists, skipping creation"
+                        )
+                        continue
+
+                    new_alarm_def.metric.dimensions = metric.dimensions
+                    cwagent_alarm_definitions.add_alarm(new_alarm_def)
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to create alarm definition for metric {metric}: {e}"
+                    )
+                    continue
+
+        except Exception as e:
+            logger.error(
+                f"Failed to create CWAgent alarm definitions for resource {resource.id}: {e}"
+            )
+
+        return cwagent_alarm_definitions
+
     def _create_single_alarm_definition(
-        self,
-        alarm: AlarmConfig,
-        resource: Resource,
+        self, alarm: AlarmConfig, resource: Resource
     ) -> Optional[AlarmConfig]:
-        """Create alarm definition for a specific resource and metric."""
         alarm_name = f"{self.landing_zone.name}-{resource.type}-{resource.name}-{alarm.metric_name()}"
 
         if self._is_alarm_exists(alarm_name):
@@ -208,6 +269,7 @@ class AlarmManager:
             return None
 
         threshold = self._get_threshold_value(resource.type, alarm.metric.name)
+
         if threshold is None:
             logger.warning(
                 f"Missing threshold config for {resource.type}.{alarm.metric.name}"
@@ -224,29 +286,6 @@ class AlarmManager:
         )
 
         return new_alarm
-
-    def _update_alarm_definitions(
-        self, alarm_def: AlarmConfig, resource: Resource
-    ) -> Alarms:
-        """Create multiple alarm definitions for custom metrics."""
-        custom_alarm_definitions = Alarms()
-        custom_metrics = self._existing_custom_metrics.get_metrics(resource.id)
-
-        for index, metric in enumerate(custom_metrics):
-            if metric.name != alarm_def.metric.name:
-                continue
-
-            new_alarm_def = deepcopy(alarm_def)
-            new_alarm_def.name = f"{alarm_def.name}-{index}"
-            if self._is_alarm_exists(new_alarm_def.name):
-                logger.info(
-                    f"Alarm {new_alarm_def.name} already exists, skipping creation"
-                )
-                continue
-            new_alarm_def.metric.dimensions = metric.dimensions
-            custom_alarm_definitions.add_alarm(new_alarm_def)
-
-        return custom_alarm_definitions
 
     def _deploy_single_alarm(self, session: AWSSession, alarm: AlarmConfig) -> None:
         """Deploy a single CloudWatch alarm."""
@@ -276,13 +315,6 @@ class AlarmManager:
             logger.error(f"Error deploying alarm {alarm.name}: {e}")
             raise
 
-    #### Utility Methods ####
-    def _is_custom_metric(self, metric_name: str) -> bool:
-        return any(
-            custom_metric["name"] == metric_name
-            for custom_metric in self._custom_configs.get("metrics", [])
-        )
-
     def _is_alarm_exists(self, alarm_name: str) -> bool:
         """Check if an alarm already exists."""
         if not self._existing_alarms:
@@ -311,22 +343,25 @@ class AlarmManager:
             {"Key": MANAGE_BY_TAG_KEY, "Value": CMS_MANAGED_TAG_VALUE},
         ]
 
-    def _fetch_existing_custom_metrics(self) -> None:
-        """Fetch and cache existing custom metrics from CloudWatch."""
-        for metric in self._custom_configs.get("metrics", []):
+    def _is_cwagent_namespace(self, namespace: str) -> bool:
+        return namespace == "CWAgent"
+
+    def _fetch_cwagent_metrics(self) -> None:
+        """Fetch and cache valid and existing CWAgent metrics from CloudWatch."""
+        for metric_name, distinct_dimension_key in CWAGENT_METRICS.items():
             try:
-                metrics = self._fetch_metric_in_namespace(
-                    metric["namespace"], metric["name"]
-                )
-                for custom_metric in metrics:
+                metrics = self._fetch_metric_in_namespace("CWAgent", metric_name)
+                for cwagent_metric in metrics:
                     metric_config = MetricConfig(
-                        name=custom_metric.get("MetricName", ""),
-                        namespace=custom_metric.get("Namespace", ""),
-                        dimensions=custom_metric.get("Dimensions", []),
+                        name=cwagent_metric.get("MetricName", ""),
+                        namespace=cwagent_metric.get("Namespace", ""),
+                        dimensions=cwagent_metric.get("Dimensions", []),
                     )
-                    self._existing_custom_metrics.add_metric(metric_config)
+                    self._cwagent_metrics.add_metric(
+                        metric_config, self._monitored_ec2, distinct_dimension_key
+                    )
             except Exception as e:
-                logger.error(f"Failed to fetch custom metric {metric['name']}: {e}")
+                logger.error(f"Failed to fetch cwagent metric {metric_name}: {e}")
 
     def _fetch_metric_in_namespace(
         self, namespace: str, metric_name: str

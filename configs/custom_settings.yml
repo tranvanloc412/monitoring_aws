@@ -16,9 +16,9 @@ sns_mappings:
       categories: ["CAT_C"]
       sns_topics:
         - HIPNotifySpokeCMSTopicHigh"
-
-metrics:
-  - name: "disk_used_percent"
-    namespace: "CWAgent"
-  - name: "LogicalDisk % Free Space"
-    namespace: "CWAgent"
+# metrics:
+#   - name: "disk_used_percent"
+#     diffrentiate: "path"
+#     namespace: "CWAgent"
+#   - name: "LogicalDisk % Free Space"
+#     namespace: "CWAgent"
