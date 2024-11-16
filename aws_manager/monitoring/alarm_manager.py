@@ -20,6 +20,7 @@ class AlarmManager:
     Handles alarm configuration, creation, and deployment.
     """
 
+    #### Initialization Methods ####
     def __init__(
         self,
         landing_zone: LandingZone,
@@ -29,7 +30,7 @@ class AlarmManager:
         category_config_path: Path,
         custom_config_path: Path,
     ) -> None:
-        """Initialize AlarmManager with required configurations."""
+        # AWS and Resource related
         self.landing_zone = landing_zone
         self.aws_session = aws_session
         self.monitored_resources = monitored_resources
@@ -38,72 +39,10 @@ class AlarmManager:
         self._load_configurations(
             alarm_config_path, category_config_path, custom_config_path
         )
+
+        # Load states
         self._load_states()
 
-    #### Public Methods ####
-    # ---- Alarm Deployment ----
-    def deploy_alarms(self, alarms: Alarms) -> None:
-        """Deploy alarms in parallel batches."""
-        with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
-            futures = {
-                executor.submit(
-                    self._deploy_single_alarm, self.aws_session, alarm
-                ): alarm.name
-                for alarm in alarms.alarms
-            }
-
-            for future in as_completed(futures):
-                alarm_name = futures[future]
-                try:
-                    future.result()
-                    logger.info(f"Deployed alarm: {alarm_name}")
-                except Exception as e:
-                    logger.error(f"Failed to deploy {alarm_name}: {e}")
-                    raise
-
-    def scan_alarms(self) -> None:
-        """Scan and cache existing alarms in the AWS account."""
-        logger.info(
-            f"Successfully scanned resources for landing zone: {self.landing_zone.name}"
-        )
-        # logger.info(f"Existing alarms: {self._existing_alarms}")
-
-    def delete_alarms(self) -> None:
-        """Delete all alarms in the AWS account."""
-        logger.info(f"Deleting alarms for landing zone: {self.landing_zone.name}")
-        for alarm in self._existing_alarms:
-            self.aws_session.session.client("cloudwatch").delete_alarms(
-                AlarmNames=[alarm]
-            )
-            logger.info(f"Deleted alarm: {alarm}")
-
-    # ---- Alarm Definition Creation ----
-    def create_all_alarm_definitions(self) -> Alarms:
-        """Create alarm definitions for all resources."""
-        try:
-            all_alarm_definitions = Alarms()
-            with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
-                futures = {
-                    executor.submit(self._create_alarm_definitions, resource): resource
-                    for resource in self.monitored_resources
-                }
-
-                for future in as_completed(futures):
-                    resource = futures[future]
-                    try:
-                        alarms = future.result()
-                        all_alarm_definitions.add_alarm(alarms)
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to create alarm definitions for {resource.name}: {e}"
-                        )
-
-            return all_alarm_definitions
-        except Exception as e:
-            logger.error(f"Failed to create all alarm definitions: {e}")
-            return Alarms()
-
-    #### Private Configuration Methods ####
     def _load_configurations(
         self,
         alarm_config_path: Path,
@@ -133,51 +72,72 @@ class AlarmManager:
             for resource in self.monitored_resources
             if resource.type == "EC2"
         }
+        self._rds_storage_map = self._get_rds_storage_map()
         self._scan_existing_alarms()
         self._fetch_cwagent_metrics()
-        # print(f"self._cwagent_metrics: {self._cwagent_metrics.metrics}")
 
-    def _get_alarm_config_by_resource_type(
-        self, resource_type: str
-    ) -> List[AlarmConfig]:
-        return self._alarm_configs.get(resource_type, [])
+    #### Public Interface Methods ####
+    def deploy_alarms(self, alarms: Alarms) -> None:
+        """Deploy alarms in parallel batches."""
+        with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(
+                    self._deploy_single_alarm, self.aws_session, alarm
+                ): alarm.name
+                for alarm in alarms.alarms
+            }
 
-    def _get_dimensions(self, resource: Resource) -> List[Dict[str, str]]:
-        """Get dimensions for a specific resource based on resource type."""
-        dimension_key = DIMENSION_KEYS.get(resource.type)
-        if not dimension_key:
-            logger.warning(f"No dimension key found for resource type {resource.type}")
-            return []
+            for future in as_completed(futures):
+                alarm_name = futures[future]
+                try:
+                    future.result()
+                    logger.info(f"Deployed alarm: {alarm_name}")
+                except Exception as e:
+                    logger.error(f"Failed to deploy {alarm_name}: {e}")
+                    raise
 
-        dimensions = [{"Name": dimension_key, "Value": resource.id}]
-        return dimensions
-
-    def _get_threshold_value(
-        self, resource_type: str, metric_name: str
-    ) -> Optional[float]:
-        """Get threshold value for a specific resource type and metric."""
-        return self._threshold_configs.get(resource_type).get(metric_name, {})
-
-    def _get_sns_topics(self, resource_type: str, metric_name: str) -> List[str]:
-        """Get SNS topic ARNs for the given resource type and metric."""
-        sns_prefix = f"arn:aws:sns:{DEFAULT_REGION}:{self.landing_zone.account_id}:"
-        sns_topic_arns = self._sns_topics
-
-        # Get custom topic configuration
-        custom_sns_mappings = (
-            self._custom_configs.get("sns_mappings", {})
-            .get(resource_type, {})
-            .get(metric_name, {})
+    def scan_alarms(self) -> None:
+        """Scan and cache existing alarms in the AWS account."""
+        logger.info(
+            f"Successfully scanned resources for landing zone: {self.landing_zone.name}"
         )
+        logger.info(f"Existing alarms: {self._existing_alarms}")
 
-        if (
-            custom_sns_mappings
-            and self.landing_zone.category in custom_sns_mappings.get("categories", [])
-        ):
-            sns_topic_arns = custom_sns_mappings.get("sns_topics", self._sns_topics)
+    def delete_alarms(self) -> None:
+        """Delete all alarms in the AWS account."""
+        logger.info(f"Deleting alarms for landing zone: {self.landing_zone.name}")
+        for alarm in self._existing_alarms:
+            self.aws_session.session.client("cloudwatch").delete_alarms(
+                AlarmNames=[alarm]
+            )
+            logger.info(f"Deleted alarm: {alarm}")
 
-        return [sns_prefix + topic for topic in sns_topic_arns]
+    def create_all_alarm_definitions(self) -> Alarms:
+        """Create alarm definitions for all resources."""
+        try:
+            all_alarm_definitions = Alarms()
+            with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
+                futures = {
+                    executor.submit(self._create_alarm_definitions, resource): resource
+                    for resource in self.monitored_resources
+                }
 
+                for future in as_completed(futures):
+                    resource = futures[future]
+                    try:
+                        alarms = future.result()
+                        all_alarm_definitions.add_alarm(alarms)
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to create alarm definitions for {resource.name}: {e}"
+                        )
+
+            return all_alarm_definitions
+        except Exception as e:
+            logger.error(f"Failed to create all alarm definitions: {e}")
+            return Alarms()
+
+    #### Alarm Definition Creation Methods ####
     def _create_alarm_definitions(self, resource: Resource) -> Alarms:
         """Create alarm definitions for all metrics of a specific resource."""
         alarm_definitions = Alarms()
@@ -268,7 +228,9 @@ class AlarmManager:
             logger.info(f"Alarm {alarm_name} already exists, skipping creation")
             return None
 
-        threshold = self._get_threshold_value(resource.type, alarm.metric.name)
+        threshold = self._get_threshold_value(
+            resource.type, alarm.metric.name, resource.id
+        )
 
         if threshold is None:
             logger.warning(
@@ -286,6 +248,111 @@ class AlarmManager:
         )
 
         return new_alarm
+
+    #### Configuration Helper Methods ####
+    def _get_alarm_config_by_resource_type(
+        self, resource_type: str
+    ) -> List[AlarmConfig]:
+        return self._alarm_configs.get(resource_type, [])
+
+    def _get_dimensions(self, resource: Resource) -> List[Dict[str, str]]:
+        """Get dimensions for a specific resource based on resource type."""
+        dimension_key = DIMENSION_KEYS.get(resource.type)
+        if not dimension_key:
+            logger.warning(f"No dimension key found for resource type {resource.type}")
+            return []
+
+        dimensions = [{"Name": dimension_key, "Value": resource.id}]
+        return dimensions
+
+    def _get_sns_topics(self, resource_type: str, metric_name: str) -> List[str]:
+        """Get SNS topic ARNs for the given resource type and metric."""
+        sns_prefix = f"arn:aws:sns:{DEFAULT_REGION}:{self.landing_zone.account_id}:"
+        sns_topic_arns = self._sns_topics
+
+        # Get custom topic configuration
+        custom_sns_mappings = (
+            self._custom_configs.get("sns_mappings", {})
+            .get(resource_type, {})
+            .get(metric_name, {})
+        )
+
+        if (
+            custom_sns_mappings
+            and self.landing_zone.category in custom_sns_mappings.get("categories", [])
+        ):
+            sns_topic_arns = custom_sns_mappings.get("sns_topics", self._sns_topics)
+
+        return [sns_prefix + topic for topic in sns_topic_arns]
+
+    def _get_threshold_value(
+        self, resource_type: str, metric_name: str, resource_id: str
+    ) -> Optional[float]:
+        """Get threshold value for a specific resource type and metric."""
+        resource_thresholds = self._threshold_configs.get(resource_type, {})
+        threshold = resource_thresholds.get(metric_name)
+        if threshold is None:
+            logger.warning(f"No threshold found for {resource_type}.{metric_name}")
+            return None
+
+        if resource_type == "RDS" and metric_name == "FreeStorageSpace":
+            threshold = self._convert_rds_storage_threshold_to_bytes(
+                threshold, resource_id
+            )
+        return threshold
+
+    def _get_rds_storage_map(self) -> Dict[str, int]:
+        """
+        Get a mapping of RDS instance IDs to their allocated storage in GiB.
+        Returns a dictionary of {instance_id: allocated_storage}
+        """
+        storage_map = {}
+        try:
+            rds_client = self.aws_session.session.client("rds")
+            paginator = rds_client.get_paginator("describe_db_instances")
+
+            for page in paginator.paginate():
+                for instance in page["DBInstances"]:
+                    storage_map[instance["DBInstanceIdentifier"]] = instance[
+                        "AllocatedStorage"
+                    ]
+
+            return storage_map
+        except Exception as e:
+            logger.error(f"Failed to fetch RDS storage information: {e}")
+            return {}
+
+    def _convert_rds_storage_threshold_to_bytes(
+        self, threshold_percentage: float, resource_id: str
+    ) -> Optional[float]:
+        """
+        Convert percentage threshold to GB based on RDS allocated storage.
+        Example: If RDS has 100GB storage and threshold is 10%, returns 10GB
+        """
+        DEFAULT_THRESHOLD_GB = 10  # 10GB default
+        try:
+            # Get allocated storage from cached map
+            allocated_storage_gib = self._rds_storage_map.get(resource_id)
+            if allocated_storage_gib is None:
+                raise KeyError(
+                    f"No storage information found for RDS instance {resource_id}"
+                )
+
+            # Convert percentage to Bytes
+            threshold_bytes = (
+                (threshold_percentage / 100)
+                * allocated_storage_gib
+                * 1024
+                * 1024
+                * 1024
+            )
+
+            return threshold_bytes
+        except Exception as e:
+            logger.error(
+                f"Failed to convert threshold to bytes for RDS instance {resource_id}: {e}"
+            )
+            return DEFAULT_THRESHOLD_GB * 1024 * 1024 * 1024  # Convert 10GB to bytes
 
     def _deploy_single_alarm(self, session: AWSSession, alarm: AlarmConfig) -> None:
         """Deploy a single CloudWatch alarm."""

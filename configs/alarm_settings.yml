@@ -55,7 +55,7 @@ RDS:
       namespace: "AWS/RDS"
     statistic: "Average"
     comparison_operator: "LessThanThreshold"
-    unit: "Percent"
+    unit: "Bytes"
     period: 3600
     evaluation_periods: 1
 # FSx:

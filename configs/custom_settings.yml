@@ -11,11 +11,11 @@ sns_mappings:
     StatusCheckFailed:
       categories: ["CAT_A", "CAT_B"]
       sns_topics:
-        - HIPNotifySpokeCMSTopicHigh"
+        - HIPNotifySpokeCMSTopicHigh
     MemoryUtilization:
       categories: ["CAT_C"]
       sns_topics:
-        - HIPNotifySpokeCMSTopicHigh"
+        - HIPNotifySpokeCMSTopicHigh
 # metrics:
 #   - name: "disk_used_percent"
 #     diffrentiate: "path"
