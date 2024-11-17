@@ -1,4 +1,3 @@
-import boto3
 import logging
 from typing import List, Dict, Optional
 from dataclasses import dataclass

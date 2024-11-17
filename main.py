@@ -1,6 +1,6 @@
-import argparse
-import logging
 from pathlib import Path
+from typing import Optional
+import logging
 
 from aws_manager import (
     LandingZoneManager,
@@ -18,6 +18,9 @@ from constants import (
     DEFAULT_REGION,
     DEFAULT_SESSION,
 )
+from cli_parser import CliParser
+from logger import LoggerSetup
+from utils import validate_config_paths
 
 # Config Paths
 BASE_DIR = Path(__file__).parent
@@ -29,32 +32,13 @@ CONFIG_PATHS = {
 }
 
 
-def setup_logging() -> logging.Logger:
-    """Setup logging configuration."""
-    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-    return logging.getLogger(__name__)
-
-
-def validate_config_paths(logger: logging.Logger) -> None:
-    """Validate that all configuration paths exist."""
-    for config_name, path in CONFIG_PATHS.items():
-        if not path.exists():
-            logger.error(f"Configuration file not found: {config_name} at {path}")
-            raise FileNotFoundError(
-                f"Configuration file not found: {config_name} at {path}"
-            )
-
-
-def setup() -> tuple[logging.Logger, LandingZoneManager]:
+def load_lz_config(logger: logging.Logger) -> LandingZoneManager:
     """Setup logging and load configurations."""
-    logger = setup_logging()
-    try:
-        validate_config_paths(logger)
-        landing_zone_manager = LandingZoneManager(CONFIG_PATHS["lz"])
-        return logger, landing_zone_manager
-    except Exception as e:
-        logger.error(f"Error during setup: {e}")
-        raise
+
+    if not validate_config_paths(CONFIG_PATHS, logger):
+        raise FileNotFoundError("Landing zone configuration file not found")
+
+    return LandingZoneManager(CONFIG_PATHS["lz"])
 
 
 def process_landing_zone(lz, args, logger: logging.Logger) -> None:
@@ -150,75 +134,21 @@ def dry_run(alarm_manager, logger, lz, action):
     logger.info(f"[DRY RUN] Completed simulation for landing zone: {lz}")
 
 
-def parse_arguments() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="CMS Monitoring Alarm Management")
-    parser.add_argument(
-        "--lz",
-        "-l",
-        type=str,
-        default="all",
-        help="Specific landing zone to process (e.g., lz250prod, cmsprod) or 'all'",
-    )
-    parser.add_argument(
-        "--action",
-        "-a",
-        type=str,
-        choices=["create", "scan", "delete"],
-        required=True,
-        help="Action to perform: 'create', 'scan', or 'delete'",
-    )
-    parser.add_argument(
-        "--dry-run",
-        "-dr",
-        action="store_true",
-        help="Dry run the action",
-    )
-
-    parser.add_argument(
-        "--change-request",
-        "-cr",
-        type=str,
-        help="Change request number for logging (required for production landing zones)",
-    )
-    return parser.parse_args()
-
-
-def is_production_lz(lz_name: str) -> bool:
-    """Check if the landing zone is a production environment."""
-    lz_name_lower = lz_name.lower()
-    return (
-        "prod" in lz_name_lower
-        and "nonprod" not in lz_name_lower
-        and "preprod" not in lz_name_lower
-    )
-
-
-def validate_production_lz(args, logger):
-    """Validate if a change request number is required for production landing zones."""
-    if is_production_lz(args.lz) and args.action == "create":
-        if not args.change_request:
-            error_message = (
-                "Change request number is required for production landing zones."
-            )
-            logger.error(error_message)
-            raise ValueError(error_message)
-
-
 def main() -> None:
     """
     Main execution function for CMS Monitoring.
     Handles the setup and deployment of alarms across all landing zones.
     """
-    args = parse_arguments()
-    logger = logging.getLogger(__name__)
+    args = CliParser.parse_arguments()
+    logger = LoggerSetup(LOG_FORMAT).get_logger()
     try:
-        logger, landing_zone_manager = setup()
         logger.info(
             f"Starting CMS Monitoring for landing zone: {args.lz} with action: {args.action}"
         )
 
-        validate_production_lz(args, logger)
+        CliParser.validate_production_lz(args, logger)
+
+        landing_zone_manager = load_lz_config(logger)
 
         if args.lz.lower() == "all":
             landing_zones = landing_zone_manager.get_all_landing_zones()

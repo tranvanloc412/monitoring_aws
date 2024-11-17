@@ -20,12 +20,29 @@ CAT_B:
     - HIPNotifySpokeCMSTopicLow
   thresholds:
     EC2:
-      CPUUtilization: 70
-      mem_used_percent: 75
+      CPUUtilization: 80
+      mem_used_percent: 85
       StatusCheckFailed: 1
-      disk_used_percent: 80
-      LogicalDisk % Free Space: 20
+      disk_used_percent: 85
+      LogicalDisk % Free Space: 15
+
+    ALB:
+      HealthyHostCount: 1
+      HTTPCode_ELB_5XX_Count: 1
+      RejectedConnectionCount: 1
+      TargetConnectionErrorCount: 1
+      HTTPCode_Target_5XX_Count: 1
+
+    NLB:
+      HealthyHostCount: 0
 
     RDS:
-      CPUUtilization: 65
-      FreeStorageSpace: 20
+      CPUUtilization: 75
+      FreeStorageSpace: 10
+      DiskQueueDepth: 75
+      ReadLatency: 1
+      WriteLatency: 5
+      SwapUsage: 100
+
+    FSx:
+      FreeStorageCapacity: 20

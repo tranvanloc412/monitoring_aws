@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from threading import Lock
 from .alarm_config import AlarmConfig, MetricConfig
-from utils.utils import load_yaml
+from utils import load_yaml
 
 logger = logging.getLogger(__name__)
 

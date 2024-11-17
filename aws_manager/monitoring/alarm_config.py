@@ -29,19 +29,18 @@ class AlarmConfig:
 
 @dataclass
 class Alarms:
-    """Configuration for a list of CloudWatch alarms"""
+    """Configuration for a set of CloudWatch alarms"""
 
     def __init__(self) -> None:
         self.alarms: List[AlarmConfig] = []
 
     def add_alarm(self, alarms: Union[AlarmConfig, "Alarms"]) -> None:
-        """Add one or more alarms to the collection."""
+        """Add one or more alarms to the collection.
+        Allows adding duplicates."""
+
         if isinstance(alarms, Alarms):
-            # Avoid duplicate alarms
-            for alarm in alarms.alarms:
-                if not self.find(alarm.name):
-                    self.alarms.append(alarm)
-        elif not self.find(alarms.name):
+            self.alarms.extend(alarms.alarms)
+        else:
             self.alarms.append(alarms)
 
     def remove_alarm(self, name: str) -> bool:

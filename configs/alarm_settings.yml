@@ -6,23 +6,23 @@ EC2:
     comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
     period: 300
-    evaluation_periods: 3
+    evaluation_periods: 2
   - metric:
       name: "mem_used_percent"
       namespace: "AWS/EC2"
     statistic: "Average"
-    comparison_operator: "GreaterThanThreshold"
+    comparison_operator: "GreaterThanOrEqualToThreshold"
     unit: "Percent"
     period: 300
     evaluation_periods: 2
   - metric:
       name: "StatusCheckFailed"
       namespace: "AWS/EC2"
-    statistic: "Average"
+    statistic: "Sum"
     comparison_operator: "GreaterThanThreshold"
     unit: "Count"
-    period: 300
-    evaluation_periods: 2
+    period: 60
+    evaluation_periods: 3
   - metric:
       name: "disk_used_percent"
       namespace: "CWAgent"
@@ -36,9 +36,61 @@ EC2:
       name: "LogicalDisk % Free Space"
       namespace: "CWAgent"
     statistic: "Average"
-    comparison_operator: "LessThanThreshold"
+    comparison_operator: "LessThanOrEqualToThreshold"
     unit: "Percent"
     period: 300
+    evaluation_periods: 2
+
+ALB:
+  - metric:
+      name: "HealthyHostCount"
+      namespace: "AWS/ApplicationELB"
+    statistic: "Average"
+    comparison_operator: "LessThanOrEqualToThreshold"
+    unit: "Count"
+    period: 60
+    evaluation_periods: 2
+  - metric:
+      name: "HTTPCode_ELB_5XX_Count"
+      namespace: "AWS/ApplicationELB"
+    statistic: "Sum"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 60
+    evaluation_periods: 5
+  - metric:
+      name: "RejectedConnectionCount"
+      namespace: "AWS/ApplicationELB"
+    statistic: "Sum"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 60
+    evaluation_periods: 5
+  - metric:
+      name: "TargetConnectionErrorCount"
+      namespace: "AWS/ApplicationELB"
+    statistic: "Sum"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 60
+    evaluation_periods: 5
+  - metric:
+      name: "HTTPCode_Target_5XX_Count"
+      namespace: "AWS/ApplicationELB"
+    statistic: "Sum"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 60
+    evaluation_periods: 5
+
+NLB:
+  - metric:
+      name: "HealthyHostCount"
+      namespace: "AWS/ApplicationELB"
+    statistic: "Sum"
+    comparison_operator: "LessThanOrEqualToThreshold"
+    unit: "Count"
+    period: 60
     evaluation_periods: 2
 
 RDS:
@@ -48,22 +100,55 @@ RDS:
     statistic: "Average"
     comparison_operator: "GreaterThanThreshold"
     unit: "Percent"
-    period: 300
-    evaluation_periods: 3
+    period: 900
+    evaluation_periods: 2
   - metric:
       name: FreeStorageSpace
       namespace: "AWS/RDS"
     statistic: "Average"
     comparison_operator: "LessThanThreshold"
-    unit: "Bytes"
-    period: 3600
-    evaluation_periods: 1
-# FSx:
-#   FreeDataStorageSpace:
-#     period: 3600
-#     evaluation_periods: 2
+    unit: "Megabytes"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: DiskQueueDepth
+      namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison_operator: "GreaterThanThreshold"
+    unit: "Count"
+    period: 60
+    evaluation_periods: 2
+  - metric:
+      name: ReadLatency
+      namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison_operator: "GreaterThanOrEqualToThreshold"
+    unit: "Milliseconds"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: WriteLatency
+      namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison_operator: "GreaterThanOrEqualToThreshold"
+    unit: "Milliseconds"
+    period: 300
+    evaluation_periods: 2
+  - metric:
+      name: SwapUsage
+      namespace: "AWS/RDS"
+    statistic: "Average"
+    comparison_operator: "GreaterThanOrEqualToThreshold"
+    unit: "Megabytes"
+    period: 300
+    evaluation_periods: 2
 
-# NLB:
-#   UnHealthyHostCount:
-#     period: 60
-#     evaluation_periods: 3
+FSx:
+  - metric:
+      name: FreeStorageCapacity
+      namespace: "AWS/FSx"
+    statistic: "Average"
+    comparison_operator: "LessThanOrEqualToThreshold"
+    unit: "Percent"
+    period: 300
+    evaluation_periods: 2

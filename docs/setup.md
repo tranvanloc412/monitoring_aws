@@ -7,7 +7,7 @@
 3. Run the following command to create a virtual environment:
 
    ```bash
-   python -m venv venv
+   python3 -m venv venv
    ```
 
    This will create a directory named `venv` in your project folder.
@@ -15,7 +15,7 @@
 ## Step 2: Activate the Virtual Environment
 
   ```bash
-  source venv/bin/activate
+  source .venv/bin/activate
   ```
 
 Once activated, your terminal prompt should change to indicate that the virtual environment is active.
@@ -26,7 +26,7 @@ Once activated, your terminal prompt should change to indicate that the virtual 
 2. Run the following command to install the packages:
 
    ```bash
-   pip install -r requirements.txt
+   pip3 install -r requirements.txt
    ```
 
 This will install all the packages listed in `requirements.txt` into your virtual environment.

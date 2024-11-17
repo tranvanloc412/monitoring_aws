@@ -228,6 +228,10 @@ class AlarmManager:
             logger.info(f"Alarm {alarm_name} already exists, skipping creation")
             return None
 
+        if self._is_disabled_alarm(resource.type, alarm.metric.name):
+            logger.info(f"Alarm {alarm_name} is disabled, skipping creation")
+            return None
+
         threshold = self._get_threshold_value(
             resource.type, alarm.metric.name, resource.id
         )
@@ -387,6 +391,13 @@ class AlarmManager:
         if not self._existing_alarms:
             self._scan_existing_alarms()
         return alarm_name in self._existing_alarms
+
+    def _is_disabled_alarm(self, resource_type: str, metric_name: str) -> bool:
+        """Check if an alarm is disabled in custom configurations."""
+        disabled_alarms = self._custom_configs.get("disabled_alarms", {})
+        return metric_name in disabled_alarms.get(self.landing_zone.name, {}).get(
+            resource_type, []
+        )
 
     def _scan_existing_alarms(self):
         """Scan and cache existing alarms in the AWS account."""

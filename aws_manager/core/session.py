@@ -42,7 +42,7 @@ class AWSSession:
 
 def assume_role(
     lz: LandingZone, role: str, region: str, role_session_name: str
-) -> Optional[AWSSession]:
+) -> AWSSession:
     """Assumes a specified role in an AWS account."""
     role_arn = f"arn:aws:iam::{lz.account_id}:role/{role}"
     try:
@@ -66,7 +66,7 @@ def assume_role(
         )
     except Exception as e:
         logger.error(f"Failed to assume role {role_arn}: {e}")
-        return None
+        raise
 
 
 class SessionManager:

@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Optional, Union
-from utils.utils import load_yaml
+from utils import load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,11 @@ class LandingZoneManager:
                     name=f"{lz['landing_zone']}{env}",
                     env=env,
                     account_id=account_id,
-                    app_id=lz.get('app_id', 'CMS'),
-                    category=lz.get('category', 'CAT_D')
+                    app_id=lz.get("app_id", "CMS"),
+                    category=lz.get("category", "CAT_D"),
                 )
                 for lz in data
-                for env, account_id in lz.get('environments', {}).items()
+                for env, account_id in lz.get("environments", {}).items()
                 if account_id
             ]
             logger.info(f"Loaded {len(cls._lz_configs)} landing zones")
