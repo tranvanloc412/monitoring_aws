@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LandingZone:
     name: str
     env: str
-    account_id: str
+    id: str
     app_id: str
     category: str
 
@@ -32,7 +32,7 @@ class LandingZoneManager:
                 LandingZone(
                     name=f"{lz['landing_zone']}{env}",
                     env=env,
-                    account_id=account_id,
+                    id=account_id,
                     app_id=lz.get("app_id", "CMS"),
                     category=lz.get("category", "CAT_D"),
                 )

@@ -8,10 +8,10 @@ DEFAULT_MAX_WORKERS: Final[int] = 5
 MANAGE_BY_TAG_KEY: Final[str] = "managed_by"
 CMS_MANAGED_TAG_VALUE: Final[str] = "CMS"
 
-# Dimension keys for native metrics
-DIMENSION_KEYS: Final[Dict[str, str]] = {
-    "EC2": "InstanceId",
-    "RDS": "DBInstanceIdentifier",
+DIMENSION_KEYS = {
+    "EC2": ["InstanceId"],
+    "RDS": ["DBInstanceIdentifier"],
+    "ALB": ["LoadBalancer", "TargetGroup"],
 }
 
 # CWAgent metrics : distinct dimensions keys

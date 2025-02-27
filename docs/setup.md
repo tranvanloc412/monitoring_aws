@@ -15,7 +15,7 @@
 ## Step 2: Activate the Virtual Environment
 
   ```bash
-  source .venv/bin/activate
+  source venv/bin/activate
   ```
 
 Once activated, your terminal prompt should change to indicate that the virtual environment is active.

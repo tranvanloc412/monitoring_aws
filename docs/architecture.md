@@ -16,39 +16,79 @@ Develop a scalable, maintainable, and extensible Python CLI tool that automates 
 
 ## High-Level Design
 
+```mermaid
+flowchart TD
+    A["Start\: Execute CLI Command"] --> B["Load Config & Setup Logging"]
+    B --> C[Parse CLI Arguments]
+    C --> D{Action: create or scan?}
+    D -- "create" --> E[Assume Role in Target Landing Zone]
+    D -- "scan" --> F[Initiate Parallel Scanning of Landing Zones]
+    E --> G[Initialize Resource Plugins]
+    F --> G
+    G --> H[Discover AWS Resources via Plugins EC2, RDS, ALB, NLB, FSx, EFS]
+    H --> I[Filter Resources by Tag: managed_by=CMS]
+    I --> J[Determine Resource Category via Config Mapping]
+    J --> K{Category}
+    K -- "CAT_A" --> L[Invoke Strict Alert Plugin High SNS]
+    K -- "CAT_B" --> M[Invoke Moderate Alert Plugin Medium SNS]
+    K -- "CAT_C" --> N[Invoke Basic Alert Plugin Low SNS]
+    K -- "CAT_D" --> O[Skip Alert Creation]
+    L --> P[Log & Audit Alert Creation]
+    M --> P
+    N --> P
+    O --> P
+    P --> Q[Output Execution Summary]
+    Q --> R[End Process]
+
+    %% Error Handling Nodes
+    B --- S[Global Error Handler Config, Logging]
+    H --- T[Resource Discovery Error Handler]
+    L --- U[Alert Creation Error Handler]
+    M --- U
+    N --- U
+    T --> Q
+    U --> Q
+```
+
 ### Core Components
 
 1. **Main Application (`main.py`):**
+
    - Entry point that initializes the application
    - Parses command-line arguments
    - Orchestrates the workflow based on user inputs
    - Handles error management and graceful shutdowns
 
 2. **CLI Parser (`cli_parser.py`):**
+
    - Handles all command-line interactions
    - Validates inputs and argument combinations
    - Provides help messages and usage examples
    - Supports subcommands for different operations
 
 3. **AWS Connection Manager (`aws_manager/core/session.py`):**
+
    - Manages AWS sessions and credentials
    - Handles role assumptions across accounts
    - Implements connection pooling and reuse
    - Provides retry logic for AWS API calls
 
 4. **Resource Manager (`aws_manager/core/resources.py`):**
+
    - Discovers resources across AWS accounts
    - Filters resources based on tags and categories
    - Implements caching for resource lookups
    - Supports pagination for large resource sets
 
 5. **Alarm Manager (`aws_manager/monitoring/alarm_manager.py`):**
+
    - Creates and deletes CloudWatch alarms
    - Manages alarm configurations and thresholds
    - Performs alarm health checks and validation
    - Supports bulk operations for efficiency
 
 6. **Configuration Manager (`aws_manager/monitoring/alarm_config_manager.py`):**
+
    - Loads and validates YAML configurations
    - Handles landing zone configurations (`configs/landing_zone_configs.yml`)
    - Manages alarm settings (`configs/alarm_settings.yml`)
@@ -56,6 +96,7 @@ Develop a scalable, maintainable, and extensible Python CLI tool that automates 
    - Manages default and custom settings (`configs/custom_settings.yml`)
 
 7. **Logger (`logger.py`):**
+
    - Implements structured logging
    - Handles local and S3 log storage
    - Provides audit trail capabilities
@@ -123,10 +164,10 @@ sequenceDiagram
     User->>Main: Execute script
     Main->>CliParser: parse_arguments()
     Main->>LoggerSetup: get_logger()
-    
+
     Main->>CliParser: validate_production_lz()
     Main->>LandingZoneManager: load_lz_config()
-    
+
     alt args.lz == "all"
         Main->>LandingZoneManager: get_all_landing_zones()
     else
@@ -164,7 +205,7 @@ sequenceDiagram
     Client->>AlarmManager: __init__(landing_zone, aws_session, ...)
     AlarmManager->>AlarmConfigManager: load_configs()
     AlarmManager->>AlarmManager: _load_states()
-    
+
     Note over AlarmManager: Initialize configurations<br/>and scan existing alarms
 
     Client->>AlarmManager: create_all_alarm_definitions()
@@ -213,40 +254,40 @@ graph TB
         MC[MetricConfig]
         CWM[CWAgentMetrics]
         CONST[Constants]
-        
+
         %% Main class relationships
         AM -->|uses| ACM
         AM -->|creates| AC
         AM -->|manages| CWM
-        
+
         %% Config relationships
         AC -->|contains| MC
         ACM -->|loads| AC
-        
+
         %% Dependencies
         AM -->|uses| CONST
         CWM -->|contains| MC
-        
+
         %% Configuration files
         CF1[alarm_config.yaml]
         CF2[category_config.yaml]
         CF3[custom_config.yaml]
-        
+
         ACM -->|loads| CF1
         ACM -->|loads| CF2
         ACM -->|loads| CF3
-        
+
         %% External Services
         AWS[AWS CloudWatch]
         AM -->|interacts| AWS
     end
-    
+
     %% Class details
     classDef main fill:#f9f,stroke:#333,stroke-width:2px
     classDef config fill:#bbf,stroke:#333,stroke-width:1px
     classDef external fill:#bfb,stroke:#333,stroke-width:1px
     classDef files fill:#ddd,stroke:#333,stroke-width:1px
-    
+
     class AM main
     class ACM,AC,MC,CWM config
     class AWS external

@@ -1,14 +1,14 @@
 - landing_zone: cms
   environments:
-    nonprod: 891377130283
+    nonprod: 954976297051
     prod:
   app_id: SPL-529
   cost_centre: V_CMS_AWS
-  category: CAT_A
+  category: CAT_B
 
 - landing_zone: lz250
-  environments: 
-    nonprod: 891377130283
+  environments:
+    nonprod: 954976297051
     prod:
   app_id: BA0529
   cost_centre: V_ODRM
